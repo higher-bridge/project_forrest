@@ -1,3 +1,21 @@
+"""
+project_forrest
+Copyright (C) 2021 Utrecht University
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
 import pandas as pd
 from pathlib import Path
 from constants import ROOT_DIR
@@ -62,8 +80,8 @@ def load_and_concatenate_files(measurement_type):
                   header=False, index=False, sep='\t')
 
 
-def load_merged_files(measurement_type):
-    files = get_list_of_files(measurement_type, '*.csv')
+def load_merged_files(measurement_type, suffix='*-merged.csv'):
+    files = get_list_of_files(measurement_type, suffix)
 
     if len(files) == 0:
         raise Exception(f'No csv-files of {measurement_type} type! Run load_and_concatenate_files first.')
@@ -71,7 +89,17 @@ def load_merged_files(measurement_type):
     IDs = [f.name[:2] for f in files]
 
     print(f'Loading {len(files)} files of type {measurement_type}: {IDs}')
-    dfs = [pd.read_csv(f, header=None) for f in files]
+
+    if suffix == '*-merged.csv':
+        dfs = [pd.read_csv(f, header=None) for f in files]
+    else:
+        dfs = [pd.read_csv(f, sep='\t') for f in files]
 
     return dfs, IDs
+
+
+def write_to_tsv(dfs, IDs, measurement_type='eyetracking', suffix='-processed.tsv'):
+    for df, ID in zip(dfs, IDs):
+        path = ROOT_DIR / 'data' / measurement_type / f'{ID}-{measurement_type}-{suffix}'
+        df.to_csv(path, sep='\t')
 

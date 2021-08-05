@@ -1,0 +1,136 @@
+"""
+project_forrest
+Copyright (C) 2021 Utrecht University
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+import numpy as np
+
+from constants import PX2DEG, HZ, HZ_HEART, CHUNK_SIZE, N_JOBS_REMODNAV
+
+import remodnav
+import heartpy as hp
+from joblib import Parallel, delayed
+import time
+
+
+def run_remodnav(files_et, verbose=True):
+    if N_JOBS_REMODNAV == 0:  # Run single core
+        results = []
+
+        for f in files_et:
+            fixations = remodnav.main([None, str(f), str(f).replace('-merged.tsv', '-extracted.tsv'),
+                                       str(PX2DEG), str(HZ)])
+            results.append(fixations)
+
+    else:  # Run with parallelism
+        arg_list = []
+        for f in files_et:
+            arg1 = str(f)
+            arg2 = str(f).replace('-merged.tsv', '-extracted.tsv')
+
+            arg_list.append([None, arg1, arg2, str(PX2DEG), str(HZ)])
+
+        results = Parallel(n_jobs=N_JOBS_REMODNAV, backend='loky', verbose=verbose)(
+            delayed(remodnav.main)(args) for args in arg_list)
+
+    return results
+
+
+def detect_heartrate(signal):
+    working_data, measures = hp.process_segmentwise(signal, sample_rate=HZ_HEART,
+                                                    segment_width=CHUNK_SIZE, segment_min_size=CHUNK_SIZE * 0.8,
+                                                    segment_overlap=0.0, mode='fast')
+
+    return measures['bpm']
+
+
+def split_into_chunks(df, measurement_type):
+    sampling_rate = HZ_HEART if measurement_type == 'heartrate' else HZ
+
+    if measurement_type == 'heartrate':
+        timestamps = np.arange(0, len(df) / sampling_rate, 1 / sampling_rate)
+    else:
+        timestamps = [onset + duration for onset, duration in zip(list(df['onset']), list(df['duration']))]
+
+    chunks = []
+    current_chunk = 1
+    max_time = CHUNK_SIZE
+
+    for stamp in list(timestamps):
+        if stamp >= max_time:
+            current_chunk += 1
+            max_time += CHUNK_SIZE
+
+        chunks.append(current_chunk)
+
+    df['chunk'] = chunks
+
+    return df
+
+
+def get_bpm_dict(df_hr, ID_hr, verbose=True):
+    bpm_dict = {key: dict() for key in ID_hr}
+
+    for df, ID in zip(df_hr, ID_hr):
+        start_id = time.time()
+        df_ = split_into_chunks(df, 'heartrate')
+
+        signal = list(df_.loc[:, 1])
+        bpm_values = detect_heartrate(signal)
+
+        for chunk in range(len(bpm_values)):
+            bpm_dict[ID][chunk] = bpm_values[chunk]
+
+        if verbose:
+            print(f'ID {ID}: {round(time.time() - start_id, 2)} seconds.',
+                  f'Mean of mean = {round(float(np.mean(bpm_values)), 2)} bpm over {len(bpm_values)} chunks.')
+
+    return bpm_dict
+
+
+def get_heartrate_metrics(df):
+    mean_overall = np.mean(df['heartrate'])
+    sd_overall = np.std(df['heartrate'])
+
+    num_sd_deviations = []
+
+    for hr in list(df['heartrate']):
+        deviation = hr - mean_overall
+        num_devations = deviation / sd_overall
+        
+        num_sd_deviations.append(num_devations)
+
+    df['sd_deviations'] = num_sd_deviations
+
+    return df
+
+
+def add_bpm_to_eyetracking(dfs, IDs, bpm_dict):
+    new_dfs = []
+
+    for df, ID in zip(dfs, IDs):
+        bpm_ID = bpm_dict[ID]
+        df['heartrate'] = [0] * len(df)
+
+        for chunk in list(bpm_ID.keys()):
+            avg_hr = bpm_ID[chunk]
+            # chunk_idx = np.argwhere(df['chunk'] == chunk)
+            df.loc[df['chunk'] == chunk, 'heartrate'] = avg_hr
+
+        df = get_heartrate_metrics(df)
+        new_dfs.append(df)
+
+    return new_dfs

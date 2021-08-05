@@ -16,15 +16,10 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pathlib import Path
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-ROOT_DIR = Path(__file__).parent
-
-# PX2DEG = 0.0185546875
-PX2DEG = 0.0142361
-HZ = 1000.0
-HZ_HEART = 500
-
-CHUNK_SIZE = 30
-
-N_JOBS_REMODNAV = 8
+def plot_heartrate(signal):
+    plt.figure()
+    plt.plot(signal)
+    plt.show()
