@@ -16,13 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from utils.load_data import load_merged_files, load_and_concatenate_files, get_list_of_files, write_to_tsv
+from utils.file_management import (load_merged_files, load_and_concatenate_files, get_list_of_files, add_ID_column,
+                                   write_to_tsv)
 from utils.detection import run_remodnav, get_bpm_dict, split_into_chunks, add_bpm_to_eyetracking
-from utils.plots import plot_heartrate
 
 
 if __name__ == '__main__':
-    # If not done before, concate file so each ID has one associated file instead of 8
+    # If not done before, concat files so each ID has one associated file instead of 8
     # load_and_concatenate_files('eyetracking')
     # load_and_concatenate_files('heartrate')
 
@@ -39,11 +39,10 @@ if __name__ == '__main__':
     # Add chunk indices to ET dataframes
     df_et = [split_into_chunks(df, 'eyetracking') for df in results]
 
-    # Get bpm per chunk and append as last column to each ET file
+    # Get bpm per chunk and append as column to each ET file
     bpm_dict = get_bpm_dict(df_hr, ID_hr, verbose=False)
     df_et = add_bpm_to_eyetracking(df_et, ID_et, bpm_dict)
 
     # Save ET files
+    add_ID_column(df_et, ID_et)
     write_to_tsv(df_et, ID_et)
-
-    print('')

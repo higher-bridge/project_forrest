@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import pandas as pd
+from itertools import repeat
 from pathlib import Path
+
 from constants import ROOT_DIR
 
 
@@ -71,35 +73,44 @@ def load_and_concatenate_files(measurement_type):
 
         df_dict[file_key] = df
 
-        new_path = ROOT_DIR / 'data' / measurement_type / f'{file_key}-{measurement_type}-merged.csv'
-        df.to_csv(new_path,
-                  header=False, index=False)
+        # new_path = ROOT_DIR / 'data' / measurement_type / f'{file_key}-{measurement_type}-merged.csv'
+        # df.to_csv(new_path,
+        #           header=False, index=False)
 
-        new_path = Path(str(new_path).replace('.csv', '.tsv'))
+        new_path = ROOT_DIR / 'data' / measurement_type / f'{file_key}-{measurement_type}-merged.tsv'
         df.to_csv(new_path,
                   header=False, index=False, sep='\t')
 
 
-def load_merged_files(measurement_type, suffix='*-merged.csv'):
+def load_merged_files(measurement_type, suffix='*-merged.tsv'):
     files = get_list_of_files(measurement_type, suffix)
 
     if len(files) == 0:
-        raise Exception(f'No csv-files of {measurement_type} type! Run load_and_concatenate_files first.')
+        raise Exception(f'No tsv-files of {measurement_type} type! Run load_and_concatenate_files first.')
 
     IDs = [f.name[:2] for f in files]
 
     print(f'Loading {len(files)} files of type {measurement_type}: {IDs}')
 
-    if suffix == '*-merged.csv':
-        dfs = [pd.read_csv(f, header=None) for f in files]
+    if suffix == '*-merged.tsv':
+        dfs = [pd.read_csv(f, sep='\t', header=None) for f in files]
     else:
         dfs = [pd.read_csv(f, sep='\t') for f in files]
 
     return dfs, IDs
 
 
+def add_ID_column(dfs, IDs):
+    new_dfs = []
+
+    for df, ID in zip(dfs, IDs):
+        df['ID'] = list(repeat(ID, len(df)))
+        new_dfs.append(df)
+
+    return new_dfs
+
 def write_to_tsv(dfs, IDs, measurement_type='eyetracking', suffix='-processed.tsv'):
     for df, ID in zip(dfs, IDs):
-        path = ROOT_DIR / 'data' / measurement_type / f'{ID}-{measurement_type}-{suffix}'
+        path = ROOT_DIR / 'data' / measurement_type / f'{ID}-{measurement_type}{suffix}'
         df.to_csv(path, sep='\t')
 

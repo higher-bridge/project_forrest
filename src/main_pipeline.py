@@ -16,19 +16,20 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from pathlib import Path
+from utils.file_management import load_merged_files, write_to_tsv
+from utils.pipeline_helper import group_by_chunks
 
-ROOT_DIR = Path(__file__).parent
 
-N_JOBS_REMODNAV = 8
-# PX2DEG = 0.0185546875
-PX2DEG = 0.0142361
-HZ = 1000.0
-HZ_HEART = 500
+if __name__ == '__main__':
+    dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
 
-CHUNK_SIZE = 30
-SD_DEV_THRESH = 1.0
+    # Explore (make plots)
+    dataframes_grouped = group_by_chunks(dataframes)
+    write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
 
-PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as regular fixations
-IND_VARS = ['duration', 'amp', 'peak_vel', 'med_vel', 'avg_vel']
-DEP_VAR = 'label_hr'
+    # Pre-process (mean, median, PCA, etc.)
+
+    # Model
+
+    # Plot results
+

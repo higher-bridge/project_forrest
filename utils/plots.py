@@ -16,10 +16,22 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import numpy as np
+
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-def plot_heartrate(signal):
+
+def plot_heartrate(signal, timestamps=None):
+    if timestamps == None:
+        timestamps = np.arange(signal)
+
     plt.figure()
-    plt.plot(signal)
+    plt.plot(timestamps, signal)
+    plt.ylabel('Pulse oximetry signal')
+    plt.xlabel('Time')
     plt.show()
+
+
+
+

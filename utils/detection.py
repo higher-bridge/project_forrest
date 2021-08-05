@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import numpy as np
 
-from constants import PX2DEG, HZ, HZ_HEART, CHUNK_SIZE, N_JOBS_REMODNAV
+from constants import PX2DEG, HZ, HZ_HEART, CHUNK_SIZE, N_JOBS_REMODNAV, SD_DEV_THRESH
 
 import remodnav
 import heartpy as hp
@@ -106,14 +106,23 @@ def get_heartrate_metrics(df):
     sd_overall = np.std(df['heartrate'])
 
     num_sd_deviations = []
+    hr_label = []
 
     for hr in list(df['heartrate']):
         deviation = hr - mean_overall
-        num_devations = deviation / sd_overall
-        
-        num_sd_deviations.append(num_devations)
+        num_deviations = deviation / sd_overall
+
+        num_sd_deviations.append(num_deviations)
+
+        if num_deviations > SD_DEV_THRESH:
+            hr_label.append(1)  # High
+        elif num_deviations < SD_DEV_THRESH:
+            hr_label.append(-1)  # Low
+        else:
+            hr_label.append(0)  # In between / normal
 
     df['sd_deviations'] = num_sd_deviations
+    df['label_hr'] = hr_label
 
     return df
 
