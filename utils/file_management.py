@@ -23,7 +23,10 @@ from pathlib import Path
 from constants import ROOT_DIR
 
 
-def get_list_of_files(measurement_type, file_type='*.tsv'):
+def get_list_of_files(measurement_type, file_type=None):
+    if file_type is None:
+        file_type = '*.tsv'
+
     path = ROOT_DIR / 'data' / measurement_type
 
     return sorted(path.glob(file_type))
@@ -42,8 +45,8 @@ def get_list_of_files(measurement_type, file_type='*.tsv'):
 #     return IDs
 
 
-def get_filenames_dict(measurement_type):
-    files = get_list_of_files(measurement_type)
+def get_filenames_dict(measurement_type, filetype_arg=None):
+    files = get_list_of_files(measurement_type, filetype_arg)
 
     file_dict = dict()
 
@@ -56,12 +59,12 @@ def get_filenames_dict(measurement_type):
             file_dict[ID] = []
             file_dict[ID].append(f)
 
-    print(f'Found {len(file_dict.keys())} IDs for {measurement_type}')
+    print(f'Found {len(file_dict.keys())} IDs for {measurement_type}: {list(file_dict.keys())}')
     return file_dict
 
 
-def load_and_concatenate_files(measurement_type):
-    file_dict = get_filenames_dict(measurement_type)
+def load_and_concatenate_files(measurement_type, filetype_arg=None):
+    file_dict = get_filenames_dict(measurement_type, filetype_arg)
 
     df_dict = dict()
 

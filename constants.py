@@ -17,18 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from pathlib import Path
+from matplotlib import rcParams
 
 ROOT_DIR = Path(__file__).parent
 
-N_JOBS_REMODNAV = 8
+N_JOBS_REMODNAV = 8  # Set how many CPU threads to use for REMODNAV (process participants simultaneously)
+
 # PX2DEG = 0.0185546875
-PX2DEG = 0.0142361
-HZ = 1000.0
-HZ_HEART = 500
+PX2DEG = 0.0142361  # Conversion factor from pixels to degrees vis. angle
+HZ = 1000.0  # Sampling rate of eye tracker
+HZ_HEART = 500  # Sampling rate of pulse oximetry
 
 CHUNK_SIZE = 30
-SD_DEV_THRESH = 1.0
+SD_DEV_THRESH = .75  # Set threshold for high/low heartrate label as N standard deviation(s)
 
-PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as regular fixations
-IND_VARS = ['duration', 'amp', 'peak_vel', 'med_vel', 'avg_vel']
+PURSUIT_AS_FIX = True  # Indicate whether smooth pursuits should be counted as regular fixations
+IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
 DEP_VAR = 'label_hr'
+
+# Matplotlib params
+rcParams['font.family'] = 'sans-serif'
+rcParams['font.serif'] = ['Times']
+rcParams['font.size'] = 9

@@ -23,15 +23,15 @@ from utils.detection import run_remodnav, get_bpm_dict, split_into_chunks, add_b
 
 if __name__ == '__main__':
     # If not done before, concat files so each ID has one associated file instead of 8
-    # load_and_concatenate_files('eyetracking')
-    # load_and_concatenate_files('heartrate')
+    load_and_concatenate_files('eyetracking', '*physio.tsv')
+    load_and_concatenate_files('heartrate', '*physio.tsv')
 
     # Load the merged files
     df_hr, ID_hr = load_merged_files('heartrate')
 
     # Retrieve file names. Use if fixation extraction has not been done before
-    # files_et = get_list_of_files('eyetracking', '*-merged.tsv')
-    # results = run_remodnav(files_et)
+    files_et = get_list_of_files('eyetracking', '*-merged.tsv')
+    results = run_remodnav(files_et)
 
     # Use if extraction already done before
     results, ID_et = load_merged_files('eyetracking', '*-extracted.tsv')

@@ -51,7 +51,7 @@ def run_remodnav(files_et, verbose=True):
 
 def detect_heartrate(signal):
     working_data, measures = hp.process_segmentwise(signal, sample_rate=HZ_HEART,
-                                                    segment_width=CHUNK_SIZE, segment_min_size=CHUNK_SIZE * 0.8,
+                                                    segment_width=CHUNK_SIZE, segment_min_size=CHUNK_SIZE * 0.5,
                                                     segment_overlap=0.0, mode='fast')
 
     return measures['bpm']
@@ -86,9 +86,10 @@ def get_bpm_dict(df_hr, ID_hr, verbose=True):
 
     for df, ID in zip(df_hr, ID_hr):
         start_id = time.time()
-        df_ = split_into_chunks(df, 'heartrate')
+        # df_ = split_into_chunks(df, 'heartrate')
 
-        signal = list(df_.loc[:, 1])
+        # signal = list(df_.loc[:, 1])
+        signal = list(df.loc[:, 1])
         bpm_values = detect_heartrate(signal)
 
         for chunk in range(len(bpm_values)):
@@ -101,27 +102,27 @@ def get_bpm_dict(df_hr, ID_hr, verbose=True):
     return bpm_dict
 
 
-def get_heartrate_metrics(df):
-    mean_overall = np.mean(df['heartrate'])
-    sd_overall = np.std(df['heartrate'])
+def get_heartrate_metrics(df, ID):
+    df_ = df.loc[df['label'] == 'FIXA']
+    df_avg = df_.groupby(['chunk']).agg('mean').reset_index()
 
-    num_sd_deviations = []
+    mean_overall = np.mean(df_avg['heartrate'])
+    sd_overall = np.std(df_avg['heartrate'])
+    se_overall = sd_overall / np.sqrt(len(df_avg))
+
+    print(f'{ID}: Mean overall = {round(mean_overall, 2)} (SD = {round(sd_overall, 2)}, SE = {round(se_overall, 2)})')
+
     hr_label = []
 
     for hr in list(df['heartrate']):
-        deviation = hr - mean_overall
-        num_deviations = deviation / sd_overall
-
-        num_sd_deviations.append(num_deviations)
-
-        if num_deviations > SD_DEV_THRESH:
+        # Compute if heartrate is higher or lower than the overall mean +/- a number of standard deviations
+        if hr > mean_overall + (sd_overall * SD_DEV_THRESH):
             hr_label.append(1)  # High
-        elif num_deviations < SD_DEV_THRESH:
+        elif hr < mean_overall - (sd_overall * SD_DEV_THRESH):
             hr_label.append(-1)  # Low
         else:
             hr_label.append(0)  # In between / normal
 
-    df['sd_deviations'] = num_sd_deviations
     df['label_hr'] = hr_label
 
     return df
@@ -139,7 +140,7 @@ def add_bpm_to_eyetracking(dfs, IDs, bpm_dict):
             # chunk_idx = np.argwhere(df['chunk'] == chunk)
             df.loc[df['chunk'] == chunk, 'heartrate'] = avg_hr
 
-        df = get_heartrate_metrics(df)
+        df = get_heartrate_metrics(df, ID)
         new_dfs.append(df)
 
     return new_dfs

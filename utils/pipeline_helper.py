@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pandas as pd
 import numpy as np
+from itertools import repeat
+
 from constants import PURSUIT_AS_FIX, IND_VARS, DEP_VAR
 
 
@@ -32,31 +34,67 @@ def rename_types(x):
         return 'NA'
 
 
+def rename_labels(x):
+    if int(x) == -1:
+        return 'low'
+    elif int(x) == 1:
+        return 'high'
+    elif int(x) == 0:
+        return 'normal'
+    else:
+        return 'NA'
+
+
+def rename_features(x):
+    if x == 'duration':
+        return 'Duration (s)'
+    elif x == 'amp':
+        return 'Amplitude (°)'
+    elif x == 'peak_vel':
+        return 'Peak velocity (°/s)'
+    elif x == 'med_vel':
+        return 'Median velocity (°/s)'
+    elif x == 'avg_vel':
+        return 'Mean velocity (°/s)'
+    elif x == 'count':
+        return 'Count (per chunk)'
+    else:
+        return x
+
+
 def group_by_chunks(dfs):
     new_dfs = []
 
     for df in dfs:
-        # Drop first column if necessary
-        # df = df.drop(['Unnamed: 0'], axis=1) if 'Unnamed: 0' in df.columns else df
+        ID = list(df['ID'])[0]
 
         # Rename eye movement types (e.g. FIXA to Fixation) and remove NA
         df['label'] = df['label'].apply(rename_types)
         df = df.loc[df['label'] != 'NA']
+
+        # Drop data where heartrate = 0 (usually last chunk)
+        df = df.loc[df['heartrate'] > 0.0]
 
         # Compute a counter and compute the mean
         df_counts = df.groupby(['chunk', 'label']).agg('count').reset_index()
         df_mean = df.groupby(['chunk', 'label']).agg('mean').reset_index()
 
         # Create a list of unnecessary columns
-        columns_to_use = IND_VARS + ['chunk', 'label', 'label_hr']
+        columns_to_use = IND_VARS + ['chunk', 'label', 'label_hr', 'heartrate']
         drop_columns = [c for c in df.columns if c not in columns_to_use]
 
         # Drop unnecessary columns from df_mean and append the counter for each movement type
         df_agg = df_mean.drop(drop_columns, axis=1)
         df_agg['count'] = df_counts['onset']
 
+        df_agg['label_hr'] = df_agg['label_hr'].apply(rename_labels)
+        df_agg['ID'] = list(repeat(ID, len(df_agg)))
+
         new_dfs.append(df_agg)
 
     return new_dfs
+
+
+
 
 
