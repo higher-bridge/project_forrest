@@ -31,9 +31,12 @@ HZ_HEART = 500  # Sampling rate of pulse oximetry
 CHUNK_SIZE = 30
 SD_DEV_THRESH = .75  # Set threshold for high/low heartrate label as N standard deviation(s)
 
-PURSUIT_AS_FIX = True  # Indicate whether smooth pursuits should be counted as regular fixations
+PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as regular fixations
 IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
 DEP_VAR = 'label_hr'
+
+TEST_SIZE = .20
+USE_FEATURE_EXPLOSION = False
 
 # Matplotlib params
 rcParams['font.family'] = 'sans-serif'

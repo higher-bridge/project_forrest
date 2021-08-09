@@ -56,22 +56,22 @@ def plot_feature_hist(df):
             df_low = df_move_type.loc[df_move_type['label_hr'] == 'low']
             df_high = df_move_type.loc[df_move_type['label_hr'] == 'high']
 
-            sns.kdeplot(x=feature, data=df_low, ax=axes[i],
-                        label='Low', color=palette[0],
-                        fill=True, linewidth=2.5,
-                        common_norm=False, linestyle='-',
-                        clip=(0.0, 350))
             sns.kdeplot(x=feature, data=df_high, ax=axes[i],
                         label='High', color=palette[1],
                         fill=True, linewidth=2.5,
                         common_norm=False, linestyle='--',
+                        clip=(0.0, 350))
+            sns.kdeplot(x=feature, data=df_low, ax=axes[i],
+                        label='Low', color=palette[0],
+                        fill=True, linewidth=2.5,
+                        common_norm=False, linestyle='-',
                         clip=(0.0, 350))
 
             # Remove y-ticks
             axes[i].set_yticks(list())
 
             # Set feature label only on first column
-            if i % 2 == 0:
+            if i % ncols == 0:
                 axes[i].set_ylabel(rename_features(feature))
             else:
                 axes[i].set_ylabel('')
@@ -86,7 +86,7 @@ def plot_feature_hist(df):
             if i == 0:
                 axes[i].legend(fontsize=10)
 
-            if i <= 1:
+            if i < ncols:
                 print(f'{move_type}, {len(df_low)} low, {len(df_high)} high,',
                       f'{len(df_move_type) - len(df_low) - len(df_high)} in between. {len(df_move_type)} total.')
 
