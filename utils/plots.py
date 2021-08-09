@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 import seaborn as sns
 
-from constants import IND_VARS, DEP_VAR, ROOT_DIR, SD_DEV_THRESH
+from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH
 from utils.pipeline_helper import rename_features
 
 

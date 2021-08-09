@@ -33,10 +33,10 @@ SD_DEV_THRESH = .75  # Set threshold for high/low heartrate label as N standard 
 
 PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as regular fixations
 IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
-DEP_VAR = 'label_hr'
 
 TEST_SIZE = .20
-USE_FEATURE_EXPLOSION = False
+USE_FEATURE_EXPLOSION = True
+DIMENSIONS_PER_FEATURE = 2
 
 # Matplotlib params
 rcParams['font.family'] = 'sans-serif'

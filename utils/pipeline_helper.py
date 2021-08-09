@@ -24,10 +24,11 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
 from sklearn.metrics import accuracy_score, auc, roc_auc_score, roc_curve
 from sklearn.linear_model import LogisticRegression
+from sklearn.decomposition import PCA
 
 from tpot import TPOTClassifier
 
-from constants import PURSUIT_AS_FIX, IND_VARS, USE_FEATURE_EXPLOSION, TEST_SIZE, ROOT_DIR
+from constants import PURSUIT_AS_FIX, IND_VARS, USE_FEATURE_EXPLOSION, TEST_SIZE, ROOT_DIR, DIMENSIONS_PER_FEATURE
 from utils.statistical_features import stat_features
 
 
@@ -92,13 +93,16 @@ def group_by_chunks(dfs, feature_explosion=USE_FEATURE_EXPLOSION, flatten=True):
         # Compute a counter and compute the mean
         df_counts = df.groupby(['chunk', 'label']).agg(['count', 'mean']).reset_index()
 
+        # Aggregate, either by mean or with statistical descriptors
         if not feature_explosion:
             df_agg = df.groupby(['chunk', 'label']).agg({feat: np.nanmean for feat in IND_VARS}).reset_index()
         else:
             df_agg = df.groupby(['chunk', 'label']).agg({feat: stat_features for feat in IND_VARS}).reset_index()
 
+        # Add the count variable again
         df_agg['count'] = df_counts['duration']['count']
 
+        # Give each movement type its own feature column instead of having one column with strings
         if flatten:
             df_agg['label_hr'] = df_counts['label_hr']['mean']
             df_agg['ID'] = df_counts['ID']['mean']
@@ -149,6 +153,7 @@ def get_data_stats(df):
     len2 = (len(df))
 
     df = df.loc[df['label_hr'] != 'normal']
+
     len_low = len(df.loc[df['label_hr'] == 'low'])
     perc_low = round((len_low / len2) * 100, 2)
     len_high = len(df.loc[df['label_hr'] == 'high'])
@@ -158,7 +163,41 @@ def get_data_stats(df):
           f'{len_low} low ({perc_low}%), {len_high} high ({perc_high}%).')
 
 
+def reduce_dimensionality(X_train, X_test):
+    # Split dfs and run PCA per feature
+    split_dfs = []
+
+    # Columns are in format "feature descriptor move_type", e.g., "duration nanmean Fixation".
+    # For each feature and move_type combination, run separate PCA over all of its descriptors. Then apply the PCA
+    # to the test set too.
+    for move_type in ['Fixation', 'Pursuit', 'Saccade']:
+        for feature in IND_VARS:
+            cols_to_use = [col for col in X_train.columns if move_type in col and feature in col]
+
+            df_section_train = X_train.loc[:, cols_to_use]
+            df_section_test = X_test.loc[:, cols_to_use]
+
+            pca = PCA(n_components=DIMENSIONS_PER_FEATURE, svd_solver='full', whiten=True)
+            pc_train = pca.fit_transform(df_section_train)
+            pc_test = pca.transform(df_section_test)
+
+            # Append each column of the array separately
+            for i in range(DIMENSIONS_PER_FEATURE):
+                split_dfs.append((pc_train[:, i], pc_test[:, i]))
+
+        # Count variable only has one column per move type, so don't do PCA and just append it again afterward
+        split_dfs.append((X_train.loc[:, f'count  {move_type}'],
+                          X_test.loc[:, f'count  {move_type}']))
+
+    # Now put everything back in a single array, with rows for chunks and columns for PCA features
+    X_train_new = np.array([x[0] for x in split_dfs]).T
+    X_test_new = np.array([x[1] for x in split_dfs]).T
+
+    return X_train_new, X_test_new
+
+
 def prepare_data(df):
+    # Drop NANs and remove data where label is not high or low
     df = df.dropna()
     df = df.loc[df['label_hr'] != 'normal']
 
@@ -168,11 +207,13 @@ def prepare_data(df):
 
     X_base = df.drop(['ID', 'heartrate', 'label_hr', 'chunk'], axis=1)
 
+    # Retrieve a train/test split
     X_train, X_test, y_train, y_test, train_ind, test_ind = train_test_split(X_base, y, indices,
                                                                              test_size=TEST_SIZE,
                                                                              stratify=y)
 
-    # TODO: implement feature reduction in case of feature explosion
+    if USE_FEATURE_EXPLOSION:
+        X_train, X_test = reduce_dimensionality(X_train, X_test)
 
     s = StandardScaler()
     X_train_scaled = s.fit_transform(X_train)
@@ -217,7 +258,7 @@ def run_model_tpot(dataframes):
 
     (X, X_test), (y, y_test) = prepare_data(df)
 
-    pipeline_optimizer = TPOTClassifier(scoring='roc_auc',
+    pipeline_optimizer = TPOTClassifier(generations=20, scoring='roc_auc',
                                         verbosity=2, n_jobs=8)
     pipeline_optimizer.fit(X, y)
 

@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     # Model
     run_model(dataframes_exploded)
-    run_model_tpot(dataframes_exploded)
+    # run_model_tpot(dataframes_exploded)
 
     # Plot results
 
