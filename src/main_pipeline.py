@@ -18,8 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pandas as pd
 
 from utils.file_management import load_merged_files, write_to_tsv
-from utils.pipeline_helper import group_by_chunks, run_model, run_model_tpot
-from utils.plots import plot_feature_hist, plot_heartrate_hist, plot_heartrate_over_time
+from utils.pipeline_helper import (group_by_chunks, run_model,
+                                   run_model_search, run_model_tpot)
+from utils.plots import (plot_feature_hist, plot_heartrate_hist,
+                         plot_heartrate_over_time)
 
 if __name__ == '__main__':
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
@@ -37,9 +39,13 @@ if __name__ == '__main__':
     # Pre-process (mean, median, PCA, etc.)
     dataframes_exploded = group_by_chunks(dataframes, flatten=True)
 
+    # write_to_tsv(dataframes_exploded, 'eyetracking', '-exploded.tsv')
+    # dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
+
     # Model
-    run_model(dataframes_exploded)
+    # run_model(dataframes_exploded)
     # run_model_tpot(dataframes_exploded)
+    run_model_search(dataframes_exploded)
 
     # Plot results
 

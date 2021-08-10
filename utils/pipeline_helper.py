@@ -16,23 +16,26 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import pandas as pd
-import numpy as np
 from itertools import repeat
+from typing import List, Dict, Any, Tuple
 
-from sklearn.model_selection import StratifiedKFold, train_test_split
-from sklearn.preprocessing import LabelBinarizer, StandardScaler
-from sklearn.metrics import accuracy_score, auc, roc_auc_score, roc_curve
-from sklearn.linear_model import LogisticRegression
+import numpy as np
+import pandas as pd
 from sklearn.decomposition import PCA
-
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import auc, roc_auc_score, roc_curve
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import LabelBinarizer, StandardScaler
 from tpot import TPOTClassifier
 
-from constants import PURSUIT_AS_FIX, IND_VARS, USE_FEATURE_EXPLOSION, TEST_SIZE, ROOT_DIR, DIMENSIONS_PER_FEATURE
+from constants import (DIMENSIONS_PER_FEATURE, IND_VARS, PURSUIT_AS_FIX,
+                       ROOT_DIR, TEST_SIZE, USE_FEATURE_EXPLOSION)
 from utils.statistical_features import stat_features
 
 
-def rename_types(x):
+def rename_types(x: str) -> str:
     if x == 'FIXA':
         return 'Fixation'
     elif x == 'SACC':
@@ -43,7 +46,7 @@ def rename_types(x):
         return 'NA'
 
 
-def rename_labels(x):
+def rename_labels(x) -> str:
     if np.isnan(x):
         return x
 
@@ -57,7 +60,7 @@ def rename_labels(x):
         return 'NA'
 
 
-def rename_features(x):
+def rename_features(x: str) -> str:
     if x == 'duration':
         return 'Duration (s)'
     elif x == 'amp':
@@ -74,7 +77,9 @@ def rename_features(x):
         return x
 
 
-def group_by_chunks(dfs, feature_explosion=USE_FEATURE_EXPLOSION, flatten=True):
+def group_by_chunks(dfs: List[pd.DataFrame],
+                    feature_explosion: bool = USE_FEATURE_EXPLOSION,
+                    flatten: bool = True) -> List[pd.DataFrame]:
     new_dfs = []
 
     for df in dfs:
@@ -118,7 +123,7 @@ def group_by_chunks(dfs, feature_explosion=USE_FEATURE_EXPLOSION, flatten=True):
     return new_dfs
 
 
-def flatten_dataframe(df):
+def flatten_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     flattened_df = df.pivot_table(columns='label', index='chunk')
 
     cols_to_unify = []
@@ -146,7 +151,7 @@ def flatten_dataframe(df):
     return flattened_df
 
 
-def get_data_stats(df):
+def get_data_stats(df: pd.DataFrame) -> None:
     len1 = len(df)
 
     df = df.dropna()
@@ -163,7 +168,7 @@ def get_data_stats(df):
           f'{len_low} low ({perc_low}%), {len_high} high ({perc_high}%).')
 
 
-def reduce_dimensionality(X_train, X_test):
+def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[np.array, np.array]:
     # Split dfs and run PCA per feature
     split_dfs = []
 
@@ -196,7 +201,7 @@ def reduce_dimensionality(X_train, X_test):
     return X_train_new, X_test_new
 
 
-def prepare_data(df):
+def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array], Tuple[np.array, np.array]]:
     # Drop NANs and remove data where label is not high or low
     df = df.dropna()
     df = df.loc[df['label_hr'] != 'normal']
@@ -222,43 +227,98 @@ def prepare_data(df):
     return (X_train_scaled, X_test_scaled), (y_train, y_test)
 
 
-def run_model(dataframes):
+def generate_hyperparameters() -> Dict:
+    hyperparams = dict()
+
+    hyperparams['n_estimators'] = list(np.arange(10, 110, step=10))
+    hyperparams['max_depth'] = list(np.arange(1, 21, step=1)) + [None]
+    hyperparams['min_samples_split'] = list(np.arange(2, 11, step=1))
+    hyperparams['min_samples_leaf'] = list(np.arange(0.1, .6, step=.1))
+    hyperparams['max_features'] = list(np.arange(1, 16, step=1))
+
+    return hyperparams
+
+
+def run_model_search(dataframes: List[pd.DataFrame]) -> None:
+    df = pd.concat(dataframes)
+    (X, X_test), (y, y_test) = prepare_data(df)
+
+    hyperparams = generate_hyperparameters()
+
+    # Run a grid search with the specified hyperparameters
+    grid_search = GridSearchCV(RandomForestClassifier(),
+                               param_grid=hyperparams,
+                               scoring='roc_auc',
+                               n_jobs=8,
+                               verbose=1,
+                               return_train_score=True)
+    grid_search.fit(X, y)
+
+    # Write and print scores
+    to_write = f'Best score: {grid_search.best_score_}. Score on test set: {grid_search.score(X_test, y_test)}'
+    with open(ROOT_DIR / 'results' / 'model_performance.txt', 'w') as wf:
+        wf.write(to_write)
+    print(to_write)
+
+    # Retrieve, write, and print results per parameter set
+    results = pd.DataFrame(grid_search.cv_results_)
+    results['overfit_factor'] = results['mean_train_score'] / results['mean_test_score']
+    results.to_csv(ROOT_DIR / 'results' / 'cv_results.csv')
+
+    results = results.sort_values(by='overfit_factor')
+    print(results.head())
+
+
+def run_model(dataframes: List[pd.DataFrame]) -> None:
     df = pd.concat(dataframes)
     get_data_stats(df)
 
-    scores_train = []
-    scores = []
-    for attempt in range(100):
+    model_names = ['Logistic Regression', 'Random Forest', 'KNN']
+
+    scores_train = {key: [] for key in model_names}
+    scores = {key: [] for key in model_names}
+
+    for attempt in range(50):
         (X, X_test), (y, y_test) = prepare_data(df)
 
         if attempt == 0:
             print(f'Train set: {len(X)} values. Test set: {len(X_test)} values.')
 
-        model = LogisticRegression()
-        model.fit(X, y)
+        # model = LogisticRegression()
+        models = [LogisticRegression(),
+                  RandomForestClassifier(n_estimators=50, max_depth=10, class_weight='balanced'),
+                  KNeighborsClassifier()]
 
-        # Performance on train set
-        y_pred_prob = model.predict_proba(X)[::, 1]
-        auc_ = roc_auc_score(y, y_pred_prob)
-        scores_train.append(auc_)
+        for model, model_name in zip(models, model_names):
+            model.fit(X, y)
 
-        # Performance on test set
-        y_pred_prob = model.predict_proba(X_test)[::, 1]
-        auc_ = roc_auc_score(y_test, y_pred_prob)
-        scores.append(auc_)
+            # Performance on train set
+            y_pred_prob = model.predict_proba(X)[::, 1]
+            auc_ = roc_auc_score(y, y_pred_prob)
+            scores_train[model_name].append(auc_)
+
+            # Performance on test set
+            y_pred_prob = model.predict_proba(X_test)[::, 1]
+            auc_ = roc_auc_score(y_test, y_pred_prob)
+            scores[model_name].append(auc_)
+
+    for model_name in model_names:
+        train_scores = scores_train[model_name]
+        test_scores = scores[model_name]
+
+        print(f'\n{model_name}:')
+        print(f'Training mean score = {round(np.mean(train_scores), 3)} (SD = {round(np.std(train_scores), 3)})')
+        print(f'Testing mean score  = {round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)})')
 
 
-    print(f'Training mean score = {round(np.mean(scores_train), 3)} (SD = {round(np.std(scores_train), 3)})')
-    print(f'Testing mean score  = {round(np.mean(scores), 3)} (SD = {round(np.std(scores), 3)})')
-
-
-def run_model_tpot(dataframes):
+def run_model_tpot(dataframes: List[pd.DataFrame]) -> None:
     df = pd.concat(dataframes)
     get_data_stats(df)
 
     (X, X_test), (y, y_test) = prepare_data(df)
 
     pipeline_optimizer = TPOTClassifier(generations=20, scoring='roc_auc',
+                                        config_dict='TPOT light',
                                         verbosity=2, n_jobs=8)
     pipeline_optimizer.fit(X, y)
 

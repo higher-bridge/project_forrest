@@ -16,10 +16,11 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from utils.file_management import (load_merged_files, load_and_concatenate_files, get_list_of_files, add_ID_column,
-                                   write_to_tsv)
-from utils.detection import run_remodnav, get_bpm_dict, split_into_chunks, add_bpm_to_eyetracking
-
+from utils.detection import (add_bpm_to_eyetracking, get_bpm_dict,
+                             run_remodnav, split_into_chunks)
+from utils.file_management import (add_ID_column, get_list_of_files,
+                                   load_and_concatenate_files,
+                                   load_merged_files, write_to_tsv)
 
 if __name__ == '__main__':
     # If not done before, concat files so each ID has one associated file instead of 8

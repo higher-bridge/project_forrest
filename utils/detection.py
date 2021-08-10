@@ -16,17 +16,20 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import numpy as np
-
-from constants import PX2DEG, HZ, HZ_HEART, CHUNK_SIZE, N_JOBS_REMODNAV, SD_DEV_THRESH
-
-import remodnav
-import heartpy as hp
-from joblib import Parallel, delayed
 import time
+from typing import List, Dict, Any
+
+import heartpy as hp
+import numpy as np
+import pandas as pd
+import remodnav
+from joblib import Parallel, delayed
+
+from constants import (CHUNK_SIZE, HZ, HZ_HEART, N_JOBS_REMODNAV, PX2DEG,
+                       SD_DEV_THRESH)
 
 
-def run_remodnav(files_et, verbose=True):
+def run_remodnav(files_et: List[str], verbose: bool = True) -> List[Any]:
     if N_JOBS_REMODNAV == 0:  # Run single core
         results = []
 
@@ -49,7 +52,7 @@ def run_remodnav(files_et, verbose=True):
     return results
 
 
-def detect_heartrate(signal):
+def detect_heartrate(signal: List[Any]) -> List[float]:
     working_data, measures = hp.process_segmentwise(signal, sample_rate=HZ_HEART,
                                                     segment_width=CHUNK_SIZE, segment_min_size=CHUNK_SIZE * 0.5,
                                                     segment_overlap=0.0, mode='fast')
@@ -57,7 +60,7 @@ def detect_heartrate(signal):
     return measures['bpm']
 
 
-def split_into_chunks(df, measurement_type):
+def split_into_chunks(df: pd.DataFrame, measurement_type: str) -> pd.DataFrame:
     sampling_rate = HZ_HEART if measurement_type == 'heartrate' else HZ
 
     if measurement_type == 'heartrate':
@@ -81,7 +84,7 @@ def split_into_chunks(df, measurement_type):
     return df
 
 
-def get_bpm_dict(df_hr, ID_hr, verbose=True):
+def get_bpm_dict(df_hr: List[pd.DataFrame], ID_hr: List[str], verbose: bool = True) -> Dict:
     bpm_dict = {key: dict() for key in ID_hr}
 
     for df, ID in zip(df_hr, ID_hr):
@@ -102,7 +105,7 @@ def get_bpm_dict(df_hr, ID_hr, verbose=True):
     return bpm_dict
 
 
-def get_heartrate_metrics(df, ID):
+def get_heartrate_metrics(df: pd.DataFrame, ID: str) -> pd.DataFrame:
     df_ = df.loc[df['label'] == 'FIXA']
     df_avg = df_.groupby(['chunk']).agg('mean').reset_index()
 
@@ -128,7 +131,7 @@ def get_heartrate_metrics(df, ID):
     return df
 
 
-def add_bpm_to_eyetracking(dfs, IDs, bpm_dict):
+def add_bpm_to_eyetracking(dfs: List[pd.DataFrame], IDs: List[str], bpm_dict: Dict):
     new_dfs = []
 
     for df, ID in zip(dfs, IDs):

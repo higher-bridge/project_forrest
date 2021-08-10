@@ -35,7 +35,7 @@ PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as 
 IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
 
 TEST_SIZE = .20
-USE_FEATURE_EXPLOSION = True
+USE_FEATURE_EXPLOSION = False
 DIMENSIONS_PER_FEATURE = 2
 
 # Matplotlib params

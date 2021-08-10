@@ -16,14 +16,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import pandas as pd
 from itertools import repeat
 from pathlib import Path
+from typing import List, Any, Dict, Tuple
+
+import pandas as pd
 
 from constants import ROOT_DIR
 
 
-def get_list_of_files(measurement_type, file_type=None):
+def get_list_of_files(measurement_type: str, file_type: str = None) -> List[Path]:
     if file_type is None:
         file_type = '*.tsv'
 
@@ -32,20 +34,7 @@ def get_list_of_files(measurement_type, file_type=None):
     return sorted(path.glob(file_type))
 
 
-# def get_unique_IDs(files):
-#     names = [f.name for f in files]
-#
-#     IDs = []
-#     for f in names:
-#         ID = f[4:6]
-#         if ID not in IDs:
-#             IDs.append(ID)
-#
-#     print(f'Found {len(IDs)} IDs', IDs)
-#     return IDs
-
-
-def get_filenames_dict(measurement_type, filetype_arg=None):
+def get_filenames_dict(measurement_type: str, filetype_arg: str = None) -> Dict:
     files = get_list_of_files(measurement_type, filetype_arg)
 
     file_dict = dict()
@@ -63,7 +52,7 @@ def get_filenames_dict(measurement_type, filetype_arg=None):
     return file_dict
 
 
-def load_and_concatenate_files(measurement_type, filetype_arg=None):
+def load_and_concatenate_files(measurement_type: str, filetype_arg: str = None) -> None:
     file_dict = get_filenames_dict(measurement_type, filetype_arg)
 
     df_dict = dict()
@@ -85,7 +74,7 @@ def load_and_concatenate_files(measurement_type, filetype_arg=None):
                   header=False, index=False, sep='\t')
 
 
-def load_merged_files(measurement_type, suffix='*-merged.tsv'):
+def load_merged_files(measurement_type: str, suffix: str = '*-merged.tsv') -> Tuple[List[pd.DataFrame], List[str]]:
     files = get_list_of_files(measurement_type, suffix)
 
     if len(files) == 0:
@@ -103,7 +92,7 @@ def load_merged_files(measurement_type, suffix='*-merged.tsv'):
     return dfs, IDs
 
 
-def add_ID_column(dfs, IDs):
+def add_ID_column(dfs: List[pd.DataFrame], IDs: List[str]) -> List[pd.DataFrame]:
     new_dfs = []
 
     for df, ID in zip(dfs, IDs):
@@ -112,7 +101,9 @@ def add_ID_column(dfs, IDs):
 
     return new_dfs
 
-def write_to_tsv(dfs, IDs, measurement_type='eyetracking', suffix='-processed.tsv'):
+
+def write_to_tsv(dfs: List[pd.DataFrame], IDs: List[str],
+                 measurement_type: str = 'eyetracking', suffix: str = '-processed.tsv') -> None:
     for df, ID in zip(dfs, IDs):
         path = ROOT_DIR / 'data' / measurement_type / f'{ID}-{measurement_type}{suffix}'
         df.to_csv(path, sep='\t')

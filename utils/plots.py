@@ -16,17 +16,19 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import numpy as np
+from typing import List, Any
 
 import matplotlib.pyplot as plt
-from matplotlib import rcParams
+import numpy as np
+import pandas as pd
 import seaborn as sns
+from matplotlib import rcParams
 
 from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH
 from utils.pipeline_helper import rename_features
 
 
-def plot_heartrate(signal, timestamps=None):
+def plot_heartrate(signal: List[Any], timestamps: List[Any] = None) -> None:
     if timestamps == None:
         timestamps = np.arange(signal)
 
@@ -37,7 +39,7 @@ def plot_heartrate(signal, timestamps=None):
     plt.show()
 
 
-def plot_feature_hist(df):
+def plot_feature_hist(df: pd.DataFrame) -> None:
     features = IND_VARS + ['count']
     move_types = list(df['label'].unique())
 
@@ -98,7 +100,7 @@ def plot_feature_hist(df):
     plt.show()
 
 
-def plot_heartrate_hist(df):
+def plot_heartrate_hist(df: pd.DataFrame) -> None:
     palette = sns.color_palette('tab10')
 
     f = plt.figure(figsize=(7.5, 10))
@@ -138,7 +140,7 @@ def plot_heartrate_hist(df):
     plt.show()
 
 
-def plot_heartrate_over_time(df):
+def plot_heartrate_over_time(df: pd.DataFrame) -> None:
     f = plt.figure(figsize=(7.5, 10))
     axes = [f.add_subplot(8, 2, i + 1) for i in range(len(list(df['ID'].unique())))]
 
