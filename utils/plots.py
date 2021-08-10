@@ -28,17 +28,6 @@ from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH
 from utils.pipeline_helper import rename_features
 
 
-def plot_heartrate(signal: List[Any], timestamps: List[Any] = None) -> None:
-    if timestamps == None:
-        timestamps = np.arange(signal)
-
-    plt.figure()
-    plt.plot(timestamps, signal)
-    plt.ylabel('Pulse oximetry signal')
-    plt.xlabel('Time')
-    plt.show()
-
-
 def plot_feature_hist(df: pd.DataFrame) -> None:
     features = IND_VARS + ['count']
     move_types = list(df['label'].unique())
@@ -95,7 +84,7 @@ def plot_feature_hist(df: pd.DataFrame) -> None:
             i += 1
 
     plt.tight_layout()
-    save_path = ROOT_DIR / 'results' / 'plots' / 'feature_hist.png'
+    save_path = ROOT_DIR / 'results' / 'plots' / f'feature_hist.png'
     plt.savefig(save_path, dpi=600)
     plt.show()
 

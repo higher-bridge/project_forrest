@@ -22,6 +22,7 @@ from utils.pipeline_helper import (group_by_chunks, run_model,
                                    run_model_search, run_model_tpot)
 from utils.plots import (plot_feature_hist, plot_heartrate_hist,
                          plot_heartrate_over_time)
+from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION
 
 if __name__ == '__main__':
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
@@ -43,8 +44,8 @@ if __name__ == '__main__':
     # dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
 
     # Model
-    # run_model(dataframes_exploded)
-    # run_model_tpot(dataframes_exploded)
+    print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
+    run_model(dataframes_exploded)
     run_model_search(dataframes_exploded)
 
     # Plot results

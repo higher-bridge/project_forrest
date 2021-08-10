@@ -17,10 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from itertools import repeat
+import time
 from typing import List, Dict, Any, Tuple
 
 import numpy as np
 import pandas as pd
+import pickle
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -28,10 +30,12 @@ from sklearn.metrics import auc, roc_auc_score, roc_curve
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
+from sklearn.svm import SVC
 from tpot import TPOTClassifier
 
 from constants import (DIMENSIONS_PER_FEATURE, IND_VARS, PURSUIT_AS_FIX,
-                       ROOT_DIR, TEST_SIZE, USE_FEATURE_EXPLOSION)
+                       ROOT_DIR, TEST_SIZE, USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION,
+                       EXP_RED_STR)
 from utils.statistical_features import stat_features
 
 
@@ -168,9 +172,11 @@ def get_data_stats(df: pd.DataFrame) -> None:
           f'{len_low} low ({perc_low}%), {len_high} high ({perc_high}%).')
 
 
-def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[np.array, np.array]:
+def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[np.array, np.array, List[str]]:
     # Split dfs and run PCA per feature
     split_dfs = []
+
+    column_names = []
 
     # Columns are in format "feature descriptor move_type", e.g., "duration nanmean Fixation".
     # For each feature and move_type combination, run separate PCA over all of its descriptors. Then apply the PCA
@@ -189,19 +195,21 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
             # Append each column of the array separately
             for i in range(DIMENSIONS_PER_FEATURE):
                 split_dfs.append((pc_train[:, i], pc_test[:, i]))
+                column_names.append(f'{move_type} {feature} PC{i}')
 
         # Count variable only has one column per move type, so don't do PCA and just append it again afterward
         split_dfs.append((X_train.loc[:, f'count  {move_type}'],
                           X_test.loc[:, f'count  {move_type}']))
+        column_names.append(f'{move_type} count PC1')
 
     # Now put everything back in a single array, with rows for chunks and columns for PCA features
     X_train_new = np.array([x[0] for x in split_dfs]).T
     X_test_new = np.array([x[1] for x in split_dfs]).T
 
-    return X_train_new, X_test_new
+    return X_train_new, X_test_new, column_names
 
 
-def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array], Tuple[np.array, np.array]]:
+def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array], Tuple[np.array, np.array], List[str]]:
     # Drop NANs and remove data where label is not high or low
     df = df.dropna()
     df = df.loc[df['label_hr'] != 'normal']
@@ -217,23 +225,25 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array], Tuple[np.
                                                                              test_size=TEST_SIZE,
                                                                              stratify=y)
 
-    if USE_FEATURE_EXPLOSION:
-        X_train, X_test = reduce_dimensionality(X_train, X_test)
+    column_names = X_train.columns
+
+    if USE_FEATURE_EXPLOSION and USE_FEATURE_REDUCTION:
+        X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
 
     s = StandardScaler()
     X_train_scaled = s.fit_transform(X_train)
     X_test_scaled = s.transform(X_test)
 
-    return (X_train_scaled, X_test_scaled), (y_train, y_test)
+    return (X_train_scaled, X_test_scaled), (y_train, y_test), column_names
 
 
 def generate_hyperparameters() -> Dict:
     hyperparams = dict()
 
-    hyperparams['n_estimators'] = list(np.arange(10, 110, step=10))
+    hyperparams['n_estimators'] = list(np.arange(10, 160, step=10))
     hyperparams['max_depth'] = list(np.arange(1, 21, step=1)) + [None]
-    hyperparams['min_samples_split'] = list(np.arange(2, 11, step=1))
-    hyperparams['min_samples_leaf'] = list(np.arange(0.1, .6, step=.1))
+    # hyperparams['min_samples_split'] = list(np.arange(2, 11, step=1))
+    # hyperparams['min_samples_leaf'] = list(np.arange(0.1, .6, step=.1))
     hyperparams['max_features'] = list(np.arange(1, 16, step=1))
 
     return hyperparams
@@ -241,11 +251,15 @@ def generate_hyperparameters() -> Dict:
 
 def run_model_search(dataframes: List[pd.DataFrame]) -> None:
     df = pd.concat(dataframes)
-    (X, X_test), (y, y_test) = prepare_data(df)
+    get_data_stats(df)
+
+    (X, X_test), (y, y_test), column_names = prepare_data(df)
+    print(f'Train set: {len(X)} values. Test set: {len(X_test)} values.')
 
     hyperparams = generate_hyperparameters()
 
     # Run a grid search with the specified hyperparameters
+    start = time.time()
     grid_search = GridSearchCV(RandomForestClassifier(),
                                param_grid=hyperparams,
                                scoring='roc_auc',
@@ -255,18 +269,36 @@ def run_model_search(dataframes: List[pd.DataFrame]) -> None:
     grid_search.fit(X, y)
 
     # Write and print scores
-    to_write = f'Best score: {grid_search.best_score_}. Score on test set: {grid_search.score(X_test, y_test)}'
-    with open(ROOT_DIR / 'results' / 'model_performance.txt', 'w') as wf:
-        wf.write(to_write)
-    print(to_write)
+    to_write = f'Best score: {round(grid_search.best_score_, 3)}. ' \
+               f'Score on test set: {round(grid_search.score(X_test, y_test), 3)}. ' \
+               f'Duration: {round((time.time() - start) / 60, 2)} minutes.'
 
-    # Retrieve, write, and print results per parameter set
+    with open(ROOT_DIR / 'results' / f'model_performance_{EXP_RED_STR}.txt', 'w') as wf:
+        wf.write(to_write)
+    print('\n', to_write, '\n')
+
+    # Retrieve and write results per parameter set
     results = pd.DataFrame(grid_search.cv_results_)
     results['overfit_factor'] = results['mean_train_score'] / results['mean_test_score']
-    results.to_csv(ROOT_DIR / 'results' / 'cv_results.csv')
+    results.to_csv(ROOT_DIR / 'results' / f'cv_results_{EXP_RED_STR}.csv')
 
-    results = results.sort_values(by='overfit_factor')
-    print(results.head())
+    # Retrieve and write feature importances from the best estimator, if possible
+    try:
+        importances = grid_search.best_estimator_.feature_importances_
+        importances_df = pd.DataFrame(importances, index=column_names).T
+        importances_df.to_csv(ROOT_DIR / 'results' / f'best_estimator_importances_{EXP_RED_STR}.csv')
+    except:
+        print('Model does not have feature importances')
+
+    try:
+        params = grid_search.best_estimator_.get_params(deep=False)
+        params_df = pd.DataFrame(params, index=[0])
+        params_df.to_csv(ROOT_DIR / 'results' / f'best_estimator_parameters_{EXP_RED_STR}.csv')
+    except:
+        print('Could not obtain parameters from model')
+
+    # Save best estimator to pickle
+    pickle.dump(grid_search.best_estimator_, open(ROOT_DIR / 'results' / f'best_estimator_{EXP_RED_STR}.p', 'wb'))
 
 
 def run_model(dataframes: List[pd.DataFrame]) -> None:
@@ -278,15 +310,15 @@ def run_model(dataframes: List[pd.DataFrame]) -> None:
     scores_train = {key: [] for key in model_names}
     scores = {key: [] for key in model_names}
 
+    # Do multiple independent runs in order to get a good average performance metric
     for attempt in range(50):
-        (X, X_test), (y, y_test) = prepare_data(df)
+        (X, X_test), (y, y_test), column_names = prepare_data(df)
 
         if attempt == 0:
             print(f'Train set: {len(X)} values. Test set: {len(X_test)} values.')
 
-        # model = LogisticRegression()
         models = [LogisticRegression(),
-                  RandomForestClassifier(n_estimators=50, max_depth=10, class_weight='balanced'),
+                  RandomForestClassifier(),
                   KNeighborsClassifier()]
 
         for model, model_name in zip(models, model_names):
@@ -302,20 +334,25 @@ def run_model(dataframes: List[pd.DataFrame]) -> None:
             auc_ = roc_auc_score(y_test, y_pred_prob)
             scores[model_name].append(auc_)
 
+    to_write = str()
     for model_name in model_names:
         train_scores = scores_train[model_name]
         test_scores = scores[model_name]
 
-        print(f'\n{model_name}:')
-        print(f'Training mean score = {round(np.mean(train_scores), 3)} (SD = {round(np.std(train_scores), 3)})')
-        print(f'Testing mean score  = {round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)})')
+        to_write += f'\n{model_name}: '
+        to_write += f'Training mean score = {round(np.mean(train_scores), 3)} (SD = {round(np.std(train_scores), 3)}). '
+        to_write += f'Testing mean score  = {round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)}).'
+
+    with open(ROOT_DIR / 'results' / f'model_preliminary_performance_{EXP_RED_STR}.txt', 'w') as wf:
+        wf.write(to_write)
+    print(to_write, '\n')
 
 
 def run_model_tpot(dataframes: List[pd.DataFrame]) -> None:
     df = pd.concat(dataframes)
     get_data_stats(df)
 
-    (X, X_test), (y, y_test) = prepare_data(df)
+    (X, X_test), (y, y_test), column_names = prepare_data(df)
 
     pipeline_optimizer = TPOTClassifier(generations=20, scoring='roc_auc',
                                         config_dict='TPOT light',
@@ -324,6 +361,4 @@ def run_model_tpot(dataframes: List[pd.DataFrame]) -> None:
 
     print(pipeline_optimizer.score(X_test, y_test))
 
-    pipeline_optimizer.export(ROOT_DIR / 'results' / 'tpot_pipeline_export.py')
-
-
+    pipeline_optimizer.export(ROOT_DIR / 'results' / f'tpot_pipeline_export_{EXP_RED_STR}.py')

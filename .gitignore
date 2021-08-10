@@ -133,5 +133,4 @@ dmypy.json
 
 # File types
 *.tsv
-*.csv
 *.png
