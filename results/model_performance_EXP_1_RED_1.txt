@@ -1,1 +1,5 @@
-Best score: 0.71. Score on test set: 0.699. Duration: 7.87 minutes.
+Best score: 0.725. Score on test set: 0.638. Duration: 7.9 minutes.
+Best score: 0.673. Score on test set: 0.646. Duration: 8.0 minutes.
+Best score: 0.686. Score on test set: 0.583. Duration: 8.07 minutes.
+Best score: 0.703. Score on test set: 0.664. Duration: 7.84 minutes.
+Best score: 0.698. Score on test set: 0.725. Duration: 7.97 minutes.

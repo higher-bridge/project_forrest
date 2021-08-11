@@ -35,7 +35,7 @@ from tpot import TPOTClassifier
 
 from constants import (DIMENSIONS_PER_FEATURE, IND_VARS, PURSUIT_AS_FIX,
                        ROOT_DIR, TEST_SIZE, USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION,
-                       EXP_RED_STR)
+                       EXP_RED_STR, SEARCH_ITERATIONS)
 from utils.statistical_features import stat_features
 
 
@@ -172,7 +172,9 @@ def get_data_stats(df: pd.DataFrame) -> None:
           f'{len_low} low ({perc_low}%), {len_high} high ({perc_high}%).')
 
 
-def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[np.array, np.array, List[str]]:
+def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[np.array,
+                                                                                np.array,
+                                                                                List[str]]:
     # Split dfs and run PCA per feature
     split_dfs = []
 
@@ -209,7 +211,9 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
     return X_train_new, X_test_new, column_names
 
 
-def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array], Tuple[np.array, np.array], List[str]]:
+def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
+                                            Tuple[np.array, np.array],
+                                            List[str]]:
     # Drop NANs and remove data where label is not high or low
     df = df.dropna()
     df = df.loc[df['label_hr'] != 'normal']
@@ -242,19 +246,17 @@ def generate_hyperparameters() -> Dict:
 
     hyperparams['n_estimators'] = list(np.arange(10, 160, step=10))
     hyperparams['max_depth'] = list(np.arange(1, 21, step=1)) + [None]
-    # hyperparams['min_samples_split'] = list(np.arange(2, 11, step=1))
-    # hyperparams['min_samples_leaf'] = list(np.arange(0.1, .6, step=.1))
     hyperparams['max_features'] = list(np.arange(1, 16, step=1))
 
     return hyperparams
 
 
-def run_model_search(dataframes: List[pd.DataFrame]) -> None:
-    df = pd.concat(dataframes)
-    get_data_stats(df)
-
+def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[GridSearchCV,
+                                                                             List[float],
+                                                                             str,
+                                                                             List[str]]:
+    print(f'\nIteration {iteration_nr + 1}:')
     (X, X_test), (y, y_test), column_names = prepare_data(df)
-    print(f'Train set: {len(X)} values. Test set: {len(X_test)} values.')
 
     hyperparams = generate_hyperparameters()
 
@@ -267,41 +269,68 @@ def run_model_search(dataframes: List[pd.DataFrame]) -> None:
                                verbose=1,
                                return_train_score=True)
     grid_search.fit(X, y)
+    test_score = grid_search.score(X_test, y_test)
 
-    # Write and print scores
+    # TODO: also test on models ranked 2 and 3
+
+    # Print scores
     to_write = f'Best score: {round(grid_search.best_score_, 3)}. ' \
-               f'Score on test set: {round(grid_search.score(X_test, y_test), 3)}. ' \
-               f'Duration: {round((time.time() - start) / 60, 2)} minutes.'
+               f'Score on test set: {round(test_score, 3)}. ' \
+               f'Duration: {round((time.time() - start) / 60, 2)} minutes.\n'
+    print(to_write)
 
+    return grid_search, test_score, to_write, column_names
+
+
+def run_model_search(dataframes: List[pd.DataFrame]) -> None:
+    df = pd.concat(dataframes)
+    get_data_stats(df)
+
+    best_estimators = []
+    test_scores = []
+    cv_scores = []
+    text_results = ''
+    cv_results = pd.DataFrame()
+    gini_coefficients = pd.DataFrame()
+
+    for i in range(SEARCH_ITERATIONS):
+        grid_search, test_score, to_write, column_names = run_model_search_iteration(df, i)
+
+        best_estimators.append(grid_search.best_estimator_)
+        test_scores.append(test_score)
+        cv_scores.append(grid_search.best_score_)
+        text_results += to_write
+
+        cv_results_iteration = pd.DataFrame(grid_search.cv_results_)
+        cv_results_iteration['Iteration'] = [i] * len(cv_results_iteration)
+        cv_results = cv_results.append(cv_results_iteration)
+
+        gini_coefficients_iteration = pd.DataFrame(grid_search.best_estimator_.feature_importances_,
+                                                   index=column_names).T
+        gini_coefficients = gini_coefficients.append(gini_coefficients_iteration)
+
+    # Print mean score on test sets
+    print(f'Mean overall CV score on {SEARCH_ITERATIONS} iterations:',
+          f'{round(np.mean(cv_scores), 3)} (SD = {round(np.std(cv_scores), 3)})',
+          f'Mean overall test score:',
+          f'{round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)})')
+
+    # Write performance in text
     with open(ROOT_DIR / 'results' / f'model_performance_{EXP_RED_STR}.txt', 'w') as wf:
-        wf.write(to_write)
-    print('\n', to_write, '\n')
+        wf.write(text_results)
 
-    # Retrieve and write results per parameter set
-    results = pd.DataFrame(grid_search.cv_results_)
-    results['overfit_factor'] = results['mean_train_score'] / results['mean_test_score']
-    results.to_csv(ROOT_DIR / 'results' / f'cv_results_{EXP_RED_STR}.csv')
+    # Save cross-validation results
+    cv_results['overfit_factor'] = cv_results['mean_train_score'] / cv_results['mean_test_score']
+    cv_results.to_csv(ROOT_DIR / 'results' / f'cv_results_{EXP_RED_STR}.csv')
 
-    # Retrieve and write feature importances from the best estimator, if possible
-    try:
-        importances = grid_search.best_estimator_.feature_importances_
-        importances_df = pd.DataFrame(importances, index=column_names).T
-        importances_df.to_csv(ROOT_DIR / 'results' / f'best_estimator_importances_{EXP_RED_STR}.csv')
-    except:
-        print('Model does not have feature importances')
+    # Save the gini coefficients
+    gini_coefficients.to_csv(ROOT_DIR / 'results' / f'best_estimator_importances_{EXP_RED_STR}.csv')
 
-    try:
-        params = grid_search.best_estimator_.get_params(deep=False)
-        params_df = pd.DataFrame(params, index=[0])
-        params_df.to_csv(ROOT_DIR / 'results' / f'best_estimator_parameters_{EXP_RED_STR}.csv')
-    except:
-        print('Could not obtain parameters from model')
-
-    # Save best estimator to pickle
-    pickle.dump(grid_search.best_estimator_, open(ROOT_DIR / 'results' / f'best_estimator_{EXP_RED_STR}.p', 'wb'))
+    # Save best estimators to pickle
+    pickle.dump(best_estimators, open(ROOT_DIR / 'results' / f'best_estimator_{EXP_RED_STR}.p', 'wb'))
 
 
-def run_model(dataframes: List[pd.DataFrame]) -> None:
+def run_model_preselection(dataframes: List[pd.DataFrame]) -> None:
     df = pd.concat(dataframes)
     get_data_stats(df)
 

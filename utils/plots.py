@@ -21,10 +21,11 @@ from typing import List, Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.stats import ttest_1samp
 import seaborn as sns
 from matplotlib import rcParams
 
-from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH
+from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH, EXP_RED_STR
 from utils.pipeline_helper import rename_features
 
 
@@ -160,4 +161,53 @@ def plot_heartrate_over_time(df: pd.DataFrame) -> None:
     plt.savefig(save_path, dpi=600)
     plt.show()
 
+
+def test_if_significant_from_mean(values: pd.Series, overall_mean: np.array) -> bool:
+    alternative = 'less' if np.mean(values) < overall_mean else 'greater'
+    t, p = ttest_1samp(values, overall_mean, alternative=alternative)
+
+    if p < .05:
+        return True
+    else:
+        return False
+
+
+def plot_gini_coefficients() -> None:
+    path = ROOT_DIR / 'results' / f'best_estimator_importances_{EXP_RED_STR}.csv'
+    df = pd.read_csv(path)
+    df = df.drop(['Unnamed: 0'], axis=1)
+
+    features_ = [c.split() for c in df.columns]
+    features = [f'{f[1]} {rename_features(f[0])}' for f in features_]
+    df.columns = features
+
+    # Sort dataframe by median
+    df_sorted = df.reindex(df.mean().sort_values().index, axis=1)
+
+    # Melt the dataframe so that feature and value get their own columns
+    df_ = df_sorted.melt(var_name='Feature', value_name='Gini impurity')
+    df_['Movement type'] = df_['Feature'].apply(lambda x: x.split()[0])
+    df_['Movement type'] = pd.Categorical(df_['Movement type'])
+
+    plt.figure(figsize=(7.5, .33 * (len(list(df_['Feature'].unique())))))
+    sns.barplot(y='Feature', x='Gini impurity', data=df_,
+                color='gray',
+                capsize=.5, errwidth=1.2,
+                orient='h')
+    plt.axvline(x=np.mean(df_['Gini impurity']), linestyle='--', color='red')
+
+    for i, feat in enumerate(list(df_['Feature'].unique())):
+        df_feat = df_.loc[df_['Feature'] == feat]
+        p = test_if_significant_from_mean(df_feat['Gini impurity'],
+                                          np.mean(df_['Gini impurity']))
+
+        if p:
+            plt.text(x=max(df_['Gini impurity']) + .005, y=i, s='*',
+                     color='red', ha='center', va='center',
+                     fontsize=13)
+
+    plt.tight_layout()
+    savepath = ROOT_DIR / 'results' / 'plots' / f'features_gini_{EXP_RED_STR}.png'
+    plt.savefig(savepath, dpi=600)
+    plt.show()
 
