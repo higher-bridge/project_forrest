@@ -53,5 +53,3 @@ def main() -> None:
 
     # Plot results
     plot_gini_coefficients()
-
-

@@ -16,8 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from typing import Any, List
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -103,17 +101,17 @@ def plot_heartrate_hist(df: pd.DataFrame) -> None:
         df_high = df_.loc[df_['label_hr'] == 'high']
 
         sns.histplot(x='heartrate', data=df_low, ax=axes[i],
-                    label='Low', color=palette[0],
-                    stat='count', alpha=.3, multiple='layer', discrete=False, element='step',
-                    common_norm=True, linestyle='-')
+                     label='Low', color=palette[0],
+                     stat='count', alpha=.3, multiple='layer', discrete=False, element='step',
+                     common_norm=True, linestyle='-')
         sns.histplot(x='heartrate', data=df_high, ax=axes[i],
-                    label='High', color=palette[1],
-                    stat='count', alpha=.3, multiple='layer', discrete=False, element='step',
-                    common_norm=True, linestyle='--')
+                     label='High', color=palette[1],
+                     stat='count', alpha=.3, multiple='layer', discrete=False, element='step',
+                     common_norm=True, linestyle='--')
         sns.histplot(x='heartrate', data=df_, ax=axes[i],
-                    label='All', color=palette[2],
-                    stat='count', alpha=.3, multiple='layer', discrete=False, element='step',
-                    common_norm=True, linestyle='-.')
+                     label='All', color=palette[2],
+                     stat='count', alpha=.3, multiple='layer', discrete=False, element='step',
+                     common_norm=True, linestyle='-.')
 
         if i == 0:
             axes[i].legend()
@@ -210,4 +208,3 @@ def plot_gini_coefficients() -> None:
     savepath = ROOT_DIR / 'results' / 'plots' / f'features_gini_{EXP_RED_STR}.png'
     plt.savefig(savepath, dpi=600)
     plt.show()
-

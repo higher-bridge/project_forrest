@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from pathlib import Path
 import time
 from typing import Any, Dict, List
 
@@ -29,7 +30,7 @@ from constants import (CHUNK_SIZE, HZ, HZ_HEART, N_JOBS_REMODNAV, PX2DEG,
                        SD_DEV_THRESH)
 
 
-def run_remodnav(files_et: List[str], verbose: bool = True) -> List[Any]:
+def run_remodnav(files_et: List[Path], verbose: bool = True) -> List[Any]:
     if N_JOBS_REMODNAV == 0:  # Run single core
         results = []
 

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from itertools import repeat
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import pandas as pd
 
@@ -107,4 +107,3 @@ def write_to_tsv(dfs: List[pd.DataFrame], IDs: List[str],
     for df, ID in zip(dfs, IDs):
         path = ROOT_DIR / 'data' / measurement_type / f'{ID}-{measurement_type}{suffix}'
         df.to_csv(path, sep='\t')
-

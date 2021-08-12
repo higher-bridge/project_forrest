@@ -19,18 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pickle
 import time
 from itertools import repeat
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import auc, roc_auc_score, roc_curve
+from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
-from sklearn.svm import SVC
 
 from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
