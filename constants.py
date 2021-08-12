@@ -36,8 +36,8 @@ IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
 
 TEST_SIZE = .20
 SEARCH_ITERATIONS = 5
-USE_FEATURE_EXPLOSION = True
-USE_FEATURE_REDUCTION = True
+USE_FEATURE_EXPLOSION = False
+USE_FEATURE_REDUCTION = False
 DIMENSIONS_PER_FEATURE = 2
 
 # String to help with writing files, no need to touch

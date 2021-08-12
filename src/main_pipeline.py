@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pandas as pd
 
 from utils.file_management import load_merged_files, write_to_tsv
-from utils.pipeline_helper import (group_by_chunks, run_model_preselection,
+from utils.pipeline_helper import (get_scores_and_parameters,
+                                   group_by_chunks, run_model_preselection,
                                    run_model_search, run_model_tpot)
 from utils.plots import (plot_feature_hist, plot_heartrate_hist,
                          plot_heartrate_over_time, plot_gini_coefficients)
@@ -44,11 +45,13 @@ if __name__ == '__main__':
     # dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
 
     # Model
-    print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
+    # print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
     # run_model_preselection(dataframes_exploded)
-    run_model_search(dataframes_exploded)
+    # run_model_search(dataframes_exploded)
+
+    get_scores_and_parameters()
 
     # Plot results
-    plot_gini_coefficients()
+    # plot_gini_coefficients()
 
 

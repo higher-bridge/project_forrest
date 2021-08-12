@@ -271,8 +271,6 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[Gri
     grid_search.fit(X, y)
     test_score = grid_search.score(X_test, y_test)
 
-    # TODO: also test on models ranked 2 and 3
-
     # Print scores
     to_write = f'Best score: {round(grid_search.best_score_, 3)}. ' \
                f'Score on test set: {round(test_score, 3)}. ' \
@@ -391,3 +389,33 @@ def run_model_tpot(dataframes: List[pd.DataFrame]) -> None:
     print(pipeline_optimizer.score(X_test, y_test))
 
     pipeline_optimizer.export(ROOT_DIR / 'results' / f'tpot_pipeline_export_{EXP_RED_STR}.py')
+
+
+def get_scores_and_parameters() -> None:
+    path = ROOT_DIR / 'results' / f'cv_results_{EXP_RED_STR}.csv'
+    df = pd.read_csv(path)
+
+    num_iterations = list(df['Iteration'].unique())
+
+    for rank in range(3):
+        cv_list = []
+        trees_list = []
+        depth_list = []
+        feats_list = []
+
+        for i in num_iterations:
+            df_ = df.loc[df['Iteration'] == i]
+            df_ = df_.sort_values(by='mean_test_score', ascending=False)
+
+            best_row = df_.iloc[rank]
+
+            cv_list.append(best_row['mean_test_score'])
+            trees_list.append(best_row['param_n_estimators'])
+            depth_list.append(best_row['param_max_depth'])
+            feats_list.append(best_row['param_max_features'])
+
+        print(f'Rank {rank}:',
+              f'Score {round(np.mean(cv_list), 3)}',
+              f'Trees {round(np.mean(trees_list), 3)}',
+              f'Depth {round(np.mean(depth_list), 3)}',
+              f'Feat {round(np.mean(feats_list), 3)}')
