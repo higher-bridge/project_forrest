@@ -31,7 +31,6 @@ from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
 from sklearn.svm import SVC
-from tpot import TPOTClassifier
 
 from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
@@ -251,10 +250,7 @@ def generate_hyperparameters() -> Dict:
     return hyperparams
 
 
-def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[GridSearchCV,
-                                                                             List[float],
-                                                                             str,
-                                                                             List[str]]:
+def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[GridSearchCV, float, str, List[str]]:
     print(f'\nIteration {iteration_nr + 1}:')
     (X, X_test), (y, y_test), column_names = prepare_data(df)
 
@@ -373,22 +369,6 @@ def run_model_preselection(dataframes: List[pd.DataFrame]) -> None:
     with open(ROOT_DIR / 'results' / f'model_preliminary_performance_{EXP_RED_STR}.txt', 'w') as wf:
         wf.write(to_write)
     print(to_write, '\n')
-
-
-def run_model_tpot(dataframes: List[pd.DataFrame]) -> None:
-    df = pd.concat(dataframes)
-    get_data_stats(df)
-
-    (X, X_test), (y, y_test), column_names = prepare_data(df)
-
-    pipeline_optimizer = TPOTClassifier(generations=20, scoring='roc_auc',
-                                        config_dict='TPOT light',
-                                        verbosity=2, n_jobs=8)
-    pipeline_optimizer.fit(X, y)
-
-    print(pipeline_optimizer.score(X_test, y_test))
-
-    pipeline_optimizer.export(ROOT_DIR / 'results' / f'tpot_pipeline_export_{EXP_RED_STR}.py')
 
 
 def get_scores_and_parameters() -> None:
