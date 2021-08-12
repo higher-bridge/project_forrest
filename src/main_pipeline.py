@@ -20,17 +20,18 @@ import pandas as pd
 from utils.file_management import load_merged_files, write_to_tsv
 from utils.pipeline_helper import (get_scores_and_parameters,
                                    group_by_chunks, run_model_preselection,
-                                   run_model_search, run_model_tpot)
+                                   run_model_search)
 from utils.plots import (plot_feature_hist, plot_heartrate_hist,
                          plot_heartrate_over_time, plot_gini_coefficients)
 from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION
 
-if __name__ == '__main__':
+
+def main() -> None:
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
 
     # Explore (make plots)
     dataframes_grouped = group_by_chunks(dataframes, flatten=False)
-    # write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
+    write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
 
     # Combine all dataframes into one big dataframe and plot
     combined_df = pd.concat(dataframes_grouped)
@@ -40,8 +41,7 @@ if __name__ == '__main__':
 
     # Pre-process (mean, median, PCA, etc.)
     dataframes_exploded = group_by_chunks(dataframes, flatten=True)
-
-    # write_to_tsv(dataframes_exploded, 'eyetracking', '-exploded.tsv')
+    write_to_tsv(dataframes_exploded, IDs, 'eyetracking', '-exploded.tsv')
     # dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
 
     # Model

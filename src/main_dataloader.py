@@ -22,7 +22,8 @@ from utils.file_management import (add_ID_column, get_list_of_files,
                                    load_and_concatenate_files,
                                    load_merged_files, write_to_tsv)
 
-if __name__ == '__main__':
+
+def main() -> None:
     # If not done before, concat files so each ID has one associated file instead of 8
     load_and_concatenate_files('eyetracking', '*physio.tsv')
     load_and_concatenate_files('heartrate', '*physio.tsv')
