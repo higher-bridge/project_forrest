@@ -29,14 +29,14 @@ if __name__ == '__main__':
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
 
     # Explore (make plots)
-    # dataframes_grouped = group_by_chunks(dataframes, flatten=False)
+    dataframes_grouped = group_by_chunks(dataframes, flatten=False)
     # write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
 
     # Combine all dataframes into one big dataframe and plot
-    # combined_df = pd.concat(dataframes_grouped)
-    # plot_feature_hist(combined_df)
-    # plot_heartrate_hist(combined_df)
-    # plot_heartrate_over_time(combined_df)
+    combined_df = pd.concat(dataframes_grouped)
+    plot_feature_hist(combined_df)
+    plot_heartrate_hist(combined_df)
+    plot_heartrate_over_time(combined_df)
 
     # Pre-process (mean, median, PCA, etc.)
     dataframes_exploded = group_by_chunks(dataframes, flatten=True)
@@ -45,13 +45,13 @@ if __name__ == '__main__':
     # dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
 
     # Model
-    # print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
-    # run_model_preselection(dataframes_exploded)
-    # run_model_search(dataframes_exploded)
+    print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
+    run_model_preselection(dataframes_exploded)
+    run_model_search(dataframes_exploded)
 
     get_scores_and_parameters()
 
     # Plot results
-    # plot_gini_coefficients()
+    plot_gini_coefficients()
 
 

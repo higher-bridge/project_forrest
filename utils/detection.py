@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import time
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import heartpy as hp
 import numpy as np

@@ -16,13 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from itertools import repeat
+import pickle
 import time
-from typing import List, Dict, Any, Tuple
+from itertools import repeat
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
-import pickle
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
@@ -33,9 +33,9 @@ from sklearn.preprocessing import LabelBinarizer, StandardScaler
 from sklearn.svm import SVC
 from tpot import TPOTClassifier
 
-from constants import (DIMENSIONS_PER_FEATURE, IND_VARS, PURSUIT_AS_FIX,
-                       ROOT_DIR, TEST_SIZE, USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION,
-                       EXP_RED_STR, SEARCH_ITERATIONS)
+from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, IND_VARS,
+                       PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
+                       USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION)
 from utils.statistical_features import stat_features
 
 

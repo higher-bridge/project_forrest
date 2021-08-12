@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from itertools import repeat
 from pathlib import Path
-from typing import List, Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 

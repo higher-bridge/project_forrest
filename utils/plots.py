@@ -16,16 +16,16 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-from typing import List, Any
+from typing import Any, List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.stats import ttest_1samp
 import seaborn as sns
 from matplotlib import rcParams
+from scipy.stats import ttest_1samp
 
-from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH, EXP_RED_STR
+from constants import EXP_RED_STR, IND_VARS, ROOT_DIR, SD_DEV_THRESH
 from utils.pipeline_helper import rename_features
 
 
