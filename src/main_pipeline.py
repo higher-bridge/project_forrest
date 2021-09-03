@@ -23,33 +23,38 @@ from utils.pipeline_helper import (get_scores_and_parameters,
                                    run_model_search)
 from utils.plots import (plot_feature_hist, plot_heartrate_hist,
                          plot_heartrate_over_time, plot_gini_coefficients)
-from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION
+from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, SEED
 
 
 def main() -> None:
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
 
     # Explore (make plots)
-    dataframes_grouped = group_by_chunks(dataframes, flatten=False)
-    write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
+    # dataframes_grouped = group_by_chunks(dataframes, flatten=False)
+    # write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
 
     # Combine all dataframes into one big dataframe and plot
-    combined_df = pd.concat(dataframes_grouped)
-    plot_feature_hist(combined_df)
-    plot_heartrate_hist(combined_df)
-    plot_heartrate_over_time(combined_df)
+    # combined_df = pd.concat(dataframes_grouped)
+    # plot_feature_hist(combined_df)
+    # plot_heartrate_hist(combined_df)
+    # plot_heartrate_over_time(combined_df)
 
-    # Pre-process (mean, median, PCA, etc.)
+    # Pre-process data
     dataframes_exploded = group_by_chunks(dataframes, flatten=True)
     write_to_tsv(dataframes_exploded, IDs, 'eyetracking', '-exploded.tsv')
+
+    # Or load the pre-processed data if available
     # dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
 
     # Model
     print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
     run_model_preselection(dataframes_exploded)
-    run_model_search(dataframes_exploded)
 
+    run_model_search(dataframes_exploded)
     get_scores_and_parameters()
 
     # Plot results
     plot_gini_coefficients()
+
+
+main()

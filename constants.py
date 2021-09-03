@@ -16,26 +16,31 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import numpy as np
 from pathlib import Path
 from matplotlib import rcParams
 
+SEED = 42  # Set a seed for reproducibility
+np.random.seed(SEED)
+
 ROOT_DIR = Path(__file__).parent
 
-N_JOBS_REMODNAV = 8  # Set how many CPU threads to use for REMODNAV (process participants simultaneously)
+N_JOBS = 8  # Set how many CPU threads to use for REMODNAV and grid search
 
 # PX2DEG = 0.0185546875
 PX2DEG = 0.0142361  # Conversion factor from pixels to degrees vis. angle
 HZ = 1000.0  # Sampling rate of eye tracker
 HZ_HEART = 500  # Sampling rate of pulse oximetry
 
-CHUNK_SIZE = 30
+CHUNK_SIZE = 30  # In seconds
 SD_DEV_THRESH = .75  # Set threshold for high/low heartrate label as N standard deviation(s)
 
 PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as regular fixations
 IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
 
 TEST_SIZE = .20
-SEARCH_ITERATIONS = 5
+HYPERPARAMETER_SAMPLES = 1000  # Set how often to sample the hyperparameter distributions in each iteration
+SEARCH_ITERATIONS = 50  # Set how often to re-run the grid search
 USE_FEATURE_EXPLOSION = False
 USE_FEATURE_REDUCTION = False
 DIMENSIONS_PER_FEATURE = 2

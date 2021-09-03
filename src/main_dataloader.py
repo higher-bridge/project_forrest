@@ -48,3 +48,6 @@ def main() -> None:
     # Save ET files
     add_ID_column(df_et, ID_et)
     write_to_tsv(df_et, ID_et)
+
+
+main()

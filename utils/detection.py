@@ -26,12 +26,12 @@ import pandas as pd
 import remodnav
 from joblib import Parallel, delayed
 
-from constants import (CHUNK_SIZE, HZ, HZ_HEART, N_JOBS_REMODNAV, PX2DEG,
+from constants import (CHUNK_SIZE, HZ, HZ_HEART, N_JOBS, PX2DEG,
                        SD_DEV_THRESH)
 
 
 def run_remodnav(files_et: List[Path], verbose: bool = True) -> List[Any]:
-    if N_JOBS_REMODNAV == 0:  # Run single core
+    if N_JOBS == 0:  # Run single core
         results = []
 
         for f in files_et:
@@ -47,7 +47,7 @@ def run_remodnav(files_et: List[Path], verbose: bool = True) -> List[Any]:
 
             arg_list.append([None, arg1, arg2, str(PX2DEG), str(HZ)])
 
-        results = Parallel(n_jobs=N_JOBS_REMODNAV, backend='loky', verbose=verbose)(
+        results = Parallel(n_jobs=N_JOBS, backend='loky', verbose=verbose)(
             delayed(remodnav.main)(args) for args in arg_list)
 
     return results

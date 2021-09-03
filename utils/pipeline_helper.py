@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import pickle
+import random
 import time
 from itertools import repeat
 from typing import Dict, List, Tuple
@@ -27,13 +28,13 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV, train_test_split, RandomizedSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
 
 from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
-                       USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION)
+                       USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, N_JOBS, HYPERPARAMETER_SAMPLES)
 from utils.statistical_features import stat_features
 
 
@@ -240,11 +241,14 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
 
 
 def generate_hyperparameters() -> Dict:
-    hyperparams = dict()
+    n_estimators = list(np.arange(10, 160, step=1))
+    max_depth = list(np.arange(1, 21, step=1)) + [None]
+    max_features = list(np.arange(1, 16, step=1))
 
-    hyperparams['n_estimators'] = list(np.arange(10, 160, step=10))
-    hyperparams['max_depth'] = list(np.arange(1, 21, step=1)) + [None]
-    hyperparams['max_features'] = list(np.arange(1, 16, step=1))
+    hyperparams = dict()
+    hyperparams['n_estimators'] = n_estimators
+    hyperparams['max_depth'] = max_depth
+    hyperparams['max_features'] = max_features
 
     return hyperparams
 
@@ -257,12 +261,20 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[Gri
 
     # Run a grid search with the specified hyperparameters
     start = time.time()
-    grid_search = GridSearchCV(RandomForestClassifier(),
-                               param_grid=hyperparams,
-                               scoring='roc_auc',
-                               n_jobs=8,
-                               verbose=1,
-                               return_train_score=True)
+    # grid_search = GridSearchCV(RandomForestClassifier(),
+    #                            param_grid=hyperparams,
+    #                            scoring='roc_auc',
+    #                            n_jobs=N_JOBS,
+    #                            verbose=1,
+    #                            return_train_score=True)
+    grid_search = RandomizedSearchCV(RandomForestClassifier(),
+                                     param_distributions=hyperparams,
+                                     n_iter=HYPERPARAMETER_SAMPLES,
+                                     scoring='roc_auc',
+                                     n_jobs=N_JOBS,
+                                     verbose=1,
+                                     return_train_score=True)
+
     grid_search.fit(X, y)
     test_score = grid_search.score(X_test, y_test)
 
