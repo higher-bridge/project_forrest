@@ -27,7 +27,6 @@ ROOT_DIR = Path(__file__).parent
 
 N_JOBS = 8  # Set how many CPU threads to use for REMODNAV and grid search
 
-# PX2DEG = 0.0185546875
 PX2DEG = 0.0142361  # Conversion factor from pixels to degrees vis. angle
 HZ = 1000.0  # Sampling rate of eye tracker
 HZ_HEART = 500  # Sampling rate of pulse oximetry
@@ -37,6 +36,11 @@ SD_DEV_THRESH = .75  # Set threshold for high/low heartrate label as N standard 
 
 PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as regular fixations
 IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
+
+HYPERPARAMS = dict()
+HYPERPARAMS['n_estimators'] = list(np.arange(10, 160, step=1))
+HYPERPARAMS['max_depth'] = list(np.arange(1, 21, step=1)) + [None]
+HYPERPARAMS['max_features'] = list(np.arange(1, 16, step=1))
 
 TEST_SIZE = .20
 HYPERPARAMETER_SAMPLES = 1000  # Set how often to sample the hyperparameter distributions in each iteration

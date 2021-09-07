@@ -194,13 +194,17 @@ def plot_gini_coefficients() -> None:
                 orient='h')
     plt.axvline(x=np.mean(df_['Gini impurity']), linestyle='--', color='red')
 
+    # Compute the mean impurity for each feature, so we can use it later to determine the max and plot a * besides it
+    feature_means = [np.mean(df_.loc[df_['Feature'] == feat]['Gini impurity']) for feat in list(df_['Feature'].unique())]
+
+    # Run a one_sample t-test for each feature, comparing it to the overall mean
     for i, feat in enumerate(list(df_['Feature'].unique())):
         df_feat = df_.loc[df_['Feature'] == feat]
         p = test_if_significant_from_mean(df_feat['Gini impurity'],
                                           np.mean(df_['Gini impurity']))
 
         if p:
-            plt.text(x=max(df_['Gini impurity']) + .005, y=i, s='*',
+            plt.text(x=max(feature_means) * 1.08, y=i, s='*',
                      color='red', ha='center', va='center',
                      fontsize=13)
 

@@ -32,7 +32,7 @@ from sklearn.model_selection import GridSearchCV, train_test_split, RandomizedSe
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
 
-from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, IND_VARS,
+from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, HYPERPARAMS, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
                        USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, N_JOBS, HYPERPARAMETER_SAMPLES)
 from utils.statistical_features import stat_features
@@ -240,51 +240,30 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
     return (X_train_scaled, X_test_scaled), (y_train, y_test), column_names
 
 
-def generate_hyperparameters() -> Dict:
-    n_estimators = list(np.arange(10, 160, step=1))
-    max_depth = list(np.arange(1, 21, step=1)) + [None]
-    max_features = list(np.arange(1, 16, step=1))
-
-    hyperparams = dict()
-    hyperparams['n_estimators'] = n_estimators
-    hyperparams['max_depth'] = max_depth
-    hyperparams['max_features'] = max_features
-
-    return hyperparams
-
-
-def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[GridSearchCV, float, str, List[str]]:
+def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[RandomizedSearchCV, float, str, List[str]]:
     print(f'\nIteration {iteration_nr + 1}:')
     (X, X_test), (y, y_test), column_names = prepare_data(df)
 
-    hyperparams = generate_hyperparameters()
-
     # Run a grid search with the specified hyperparameters
     start = time.time()
-    # grid_search = GridSearchCV(RandomForestClassifier(),
-    #                            param_grid=hyperparams,
-    #                            scoring='roc_auc',
-    #                            n_jobs=N_JOBS,
-    #                            verbose=1,
-    #                            return_train_score=True)
-    grid_search = RandomizedSearchCV(RandomForestClassifier(),
-                                     param_distributions=hyperparams,
+    param_search = RandomizedSearchCV(RandomForestClassifier(),
+                                     param_distributions=HYPERPARAMS,
                                      n_iter=HYPERPARAMETER_SAMPLES,
                                      scoring='roc_auc',
                                      n_jobs=N_JOBS,
                                      verbose=1,
                                      return_train_score=True)
 
-    grid_search.fit(X, y)
-    test_score = grid_search.score(X_test, y_test)
+    param_search.fit(X, y)
+    test_score = param_search.score(X_test, y_test)
 
     # Print scores
-    to_write = f'Best score: {round(grid_search.best_score_, 3)}. ' \
+    to_write = f'Best score: {round(param_search.best_score_, 3)}. ' \
                f'Score on test set: {round(test_score, 3)}. ' \
                f'Duration: {round((time.time() - start) / 60, 2)} minutes.\n'
     print(to_write)
 
-    return grid_search, test_score, to_write, column_names
+    return param_search, test_score, to_write, column_names
 
 
 def run_model_search(dataframes: List[pd.DataFrame]) -> None:
@@ -408,5 +387,5 @@ def get_scores_and_parameters() -> None:
         print(f'Rank {rank}:',
               f'Score {round(np.mean(cv_list), 3)}',
               f'Trees {round(np.mean(trees_list), 3)}',
-              f'Depth {round(np.mean(depth_list), 3)}',
+              f'Depth {round(np.nanmean(depth_list), 3)}',
               f'Feat {round(np.mean(feats_list), 3)}')
