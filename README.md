@@ -9,8 +9,8 @@ Alex J. Hoogerbrugge, Zoril A. Oláh, Edwin S. Dalmaijer, Tanja C.W. Nijboer, St
 ### Procedure
 #### Data
 - Since this project uses data from a publicly available source, it is not included in the repository.
-- Links to the raw data can be retrieved from https://studyforrest.org (specifically [Hanke et al., 2016](https://www.nature.com/articles/sdata201692)) and should be placed in a subfolder of the ```data``` folder: ```data/eyetracking``` or ```data/heartrate``` respectively.
-- Raw data takes the form of ```sub-02_ses-movie_func_sub-02_ses-movie_task-movie_run-1_recording-eyegaze_physio.tsv``` for eyetracking, and ```sub-02_ses-movie_func_sub-02_ses-movie_task-movie_run-1_recording-cardresp_physio.tsv``` for pulse oximetry. 
+- Links to the raw data and their descriptions can be retrieved from https://studyforrest.org (specifically [Hanke et al., 2016](https://www.nature.com/articles/sdata201692) for the publication and [OpenNeuro](https://openneuro.org/datasets/ds000113/versions/1.3.0) for the direct link to the data) and should be placed in a subfolder of the ```data``` folder: ```data/eyetracking``` or ```data/heartrate``` respectively.
+- Raw data takes the form of ```sub-02_ses-movie_func_sub-02_ses-movie_task-movie_run-1_recording-eyegaze_physio.tsv``` for eyetracking, and ```sub-02_ses-movie_func_sub-02_ses-movie_task-movie_run-1_recording-cardresp_physio.tsv``` for pulse oximetry. Discard all other files.
 - The current version of the code looks at characters 5 and 6 to determine participant ID. Data is also sorted based on filename, so ensure that there is some numbering in the filenames for the multiple runs per participant (as is the case in the original naming scheme).
 #### Reproducibility
 - A seed value of 42 is set for numpy in ```constants.py```.
