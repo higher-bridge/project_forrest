@@ -3,7 +3,7 @@
 This repository contains the code and outcome measures for the following manuscript (link will be added once manuscript becomes available):
 
 **Seeing the Forrest through the trees: Random forests predict heart rate based on eye movement features in a naturalistic viewing task.**
-Alex J. Hoogerbrugge, Zoril A. Oláh, Edwin S. Dalmaijer, Tanja C.W. Nijboer, Stefan Van der Stigchel
+Alex J. Hoogerbrugge, Zoril A. Oláh, Edwin S. Dalmaijer, Christoph Strauch, Tanja C.W. Nijboer, Stefan Van der Stigchel
 
 
 ### Procedure
