@@ -2,7 +2,7 @@
 
 This repository contains the code and outcome measures for the following manuscript (link will be added once manuscript becomes available):
 
-**Seeing the Forrest through the trees: Random forests predict heart rate based on eye movement features in a naturalistic viewing task.**
+**Seeing the Forrest through the trees: Random forests predict heart rate based on oculomotor features in a naturalistic viewing task.**
 Alex J. Hoogerbrugge, Zoril A. Oláh, Edwin S. Dalmaijer, Christoph Strauch, Tanja C.W. Nijboer, Stefan Van der Stigchel
 
 
@@ -16,13 +16,14 @@ Alex J. Hoogerbrugge, Zoril A. Oláh, Edwin S. Dalmaijer, Christoph Strauch, Tan
 - A seed value of 42 is set for numpy in ```constants.py```.
 - All relevant output values, matching those in the manuscript, should be included in the repository. ```EXP_[0/1]_RED[0/1]``` indicate whether feature explosion and dimensionality reduction were applied to achieve this outcome measure (0 = False, 1 = True).
 - I have attempted to include the correct environment to exactly reproduce the results. Install with [Anaconda](https://www.anaconda.com/): ```conda install --name ENV_NAME --file environment.yml```.
-- However, I run a noMKL environment, so have not been able to test this extensively on different systems and CPUs.
+- I run a Ryzen 5 3600 on a UNIX-based OS (with noMKL), and have not been able to test this extensively on different systems and CPUs.
 - Nonetheless, the versions of the most important packages (e.g., scikit-learn) are equal. Please let me know if you cannot reproduce the results. 
 #### Code
 - The ```N_JOBS``` variable in ```constants.py``` sets the number of CPU threads the code will use. Be sure to check whether this is set to a suitable value for your CPU. **Note that setting a different number of jobs will affect  outcomes.**
 - After raw data has been placed in the correct folders, run ```src/main_dataloader.py```. This will perform initial pre-processing and fixation/heartrate extraction. This can take a while to run. 
     - Any static variables can be changed in ```constants.py```. 
 - Then, run ```src/main_pipeline.py```. This has been designed to run separately from the dataloader, so that the dataloader only needs to be run once. The main pipeline can also take some time to run (depending on ```N_JOBS```, ```HYPERPARAMETER_SAMPLES``` and ```SEARCH_ITERATIONS```). 
+    - It's possible to comment and uncomment sections of code if you're only looking to reproduce certain analyses.
     - Again, static variables can be changed in ```constants.py```. 
 
 
