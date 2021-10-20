@@ -26,16 +26,18 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GridSearchCV, train_test_split, RandomizedSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler
+from sklearn.utils import shuffle
 
 from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, HYPERPARAMS, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
                        USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, N_JOBS, HYPERPARAMETER_SAMPLES)
 from utils.statistical_features import stat_features
+from utils.scenediff_helper import get_scenediffs
 
 
 def rename_types(x: str) -> str:
@@ -83,6 +85,8 @@ def rename_features(x: str) -> str:
 def group_by_chunks(dfs: List[pd.DataFrame],
                     feature_explosion: bool = USE_FEATURE_EXPLOSION,
                     flatten: bool = True) -> List[pd.DataFrame]:
+    # scene_diffs = list(get_scenediffs()['norm_diff'])
+
     new_dfs = []
 
     for df in dfs:
@@ -110,16 +114,19 @@ def group_by_chunks(dfs: List[pd.DataFrame],
         # Add the count variable again
         df_agg['count'] = df_counts['duration']['count']
 
+        df_agg['label_hr'] = df_counts['label_hr']['mean']
+        df_agg['diff_hr'] = df_counts['diff_hr']['mean']
+        df_agg['sd_hr'] = df_counts['sd_hr']['mean']
+        df_agg['ID'] = df_counts['ID']['mean']
+        df_agg['heartrate'] = df_counts['heartrate']['mean']
+
         # Give each movement type its own feature column instead of having one column with strings
         if flatten:
-            df_agg['label_hr'] = df_counts['label_hr']['mean']
-            df_agg['ID'] = df_counts['ID']['mean']
-            df_agg['heartrate'] = df_counts['heartrate']['mean']
-
             df_agg = flatten_dataframe(df_agg)
 
         df_agg['label_hr'] = df_agg['label_hr'].apply(rename_labels)
         df_agg['ID'] = list(repeat(ID, len(df_agg)))
+        # df_agg['scene_diff'] = scene_diffs
 
         new_dfs.append(df_agg)
 
@@ -132,7 +139,7 @@ def flatten_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     cols_to_unify = []
     replacement_cols = dict()
     for col in flattened_df.columns:
-        if col[0] in ['ID', 'heartrate', 'label_hr']:
+        if col[0] in ['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr']:
             cols_to_unify.append(col)
 
             if col[0] not in list(replacement_cols.keys()):
@@ -221,7 +228,7 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
     y = LabelBinarizer().fit_transform(y_).ravel()
     indices = np.arange(len(y_))
 
-    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'chunk'], axis=1)
+    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr', 'chunk'], axis=1)
 
     # Retrieve a train/test split
     X_train, X_test, y_train, y_test, train_ind, test_ind = train_test_split(X_base, y, indices,
@@ -240,6 +247,42 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
     return (X_train_scaled, X_test_scaled), (y_train, y_test), column_names
 
 
+def prepare_data_continuous(df: pd.DataFrame, y_feature: str = 'heartrate') -> Tuple[Tuple[np.array, np.array],
+                                                                                     Tuple[np.array, np.array],
+                                                                                     List[str]]:
+    # Drop NANs
+    df = df.dropna()
+
+    # Get heartrates
+    y = list(df[y_feature])
+
+    # Retrieve a train/test split
+    indices = list(np.arange(len(y)))
+    train_samples = int((1 - TEST_SIZE) * len(y))
+
+    indices_shuffled = shuffle(indices)
+    train_ind = indices_shuffled[0:train_samples]
+    test_ind = indices_shuffled[train_samples:-1]
+
+    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr', 'chunk'], axis=1)
+    column_names = list(X_base.columns)
+
+    X = np.array(X_base)
+    X_train, X_test = X[train_ind], X[test_ind]
+    y_train, y_test = np.array(y)[train_ind], np.array(y)[test_ind]
+
+    if USE_FEATURE_EXPLOSION and USE_FEATURE_REDUCTION:
+        X_train = pd.DataFrame(X_train, columns=column_names)
+        X_test = pd.DataFrame(X_test, columns=column_names)
+        X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
+
+    s = StandardScaler()
+    X_train_scaled = s.fit_transform(X_train)
+    X_test_scaled = s.transform(X_test)
+
+    return (X_train_scaled, X_test_scaled), (y_train, y_test), column_names
+
+
 def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[RandomizedSearchCV, float, str, List[str]]:
     print(f'\nIteration {iteration_nr + 1}:')
     (X, X_test), (y, y_test), column_names = prepare_data(df)
@@ -247,12 +290,12 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[Ran
     # Run a grid search with the specified hyperparameters
     start = time.time()
     param_search = RandomizedSearchCV(RandomForestClassifier(),
-                                     param_distributions=HYPERPARAMS,
-                                     n_iter=HYPERPARAMETER_SAMPLES,
-                                     scoring='roc_auc',
-                                     n_jobs=N_JOBS,
-                                     verbose=1,
-                                     return_train_score=True)
+                                      param_distributions=HYPERPARAMS,
+                                      n_iter=HYPERPARAMETER_SAMPLES,
+                                      scoring='roc_auc',
+                                      n_jobs=N_JOBS,
+                                      verbose=1,
+                                      return_train_score=True)
 
     param_search.fit(X, y)
     test_score = param_search.score(X_test, y_test)
@@ -389,3 +432,45 @@ def get_scores_and_parameters() -> None:
               f'Trees {round(np.mean(trees_list), 3)}',
               f'Depth {round(np.nanmean(depth_list), 3)}',
               f'Feat {round(np.mean(feats_list), 3)}')
+
+
+def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heartrate') -> None:
+    df = pd.concat(dataframes)
+    get_data_stats(df)
+
+    train_r2 = []
+    test_r2 = []
+    coefs = []
+
+    best_model = [None, None, None, None]
+    best_model_score = 0
+
+    # Do multiple independent runs in order to get a good average performance metric
+    for attempt in range(50):
+        (X, X_test), (y, y_test), column_names = prepare_data_continuous(df, y_feature)
+
+        model = LinearRegression()
+        model.fit(X, y)
+        test_score = model.score(X_test, y_test)
+
+        train_r2.append(model.score(X, y))
+        test_r2.append(test_score)
+        coefs.append(model.coef_)
+
+        if test_score > best_model_score:
+            best_model_score = test_score
+            best_model = [model, X_test, y_test, round(test_score, 2)]
+
+    r2_train = round(np.mean(train_r2), 2)
+    r2_test = round(np.mean(test_r2), 2)
+    r2_train_sd = round(np.std(train_r2), 2)
+    r2_test_sd = round(np.std(test_r2), 2)
+
+    to_write = f'Linear regression (50 runs) mean R-squared on train set = {r2_train} (SD = {r2_train_sd}). ' \
+               f'Mean R-squared on test set = {r2_test} (SD = {r2_test_sd}). ' \
+               f'Best = {round(best_model_score, 2)}.'
+    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_{EXP_RED_STR}.txt', 'w') as wf:
+        wf.write(to_write)
+    print(to_write, '\n')
+
+    pickle.dump(best_model, open(ROOT_DIR / 'results' / f'linear_estimator_{EXP_RED_STR}.p', 'wb'))

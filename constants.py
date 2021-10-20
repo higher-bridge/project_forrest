@@ -21,7 +21,6 @@ from pathlib import Path
 from matplotlib import rcParams
 
 SEED = 42  # Set a seed for reproducibility
-np.random.seed(SEED)
 
 ROOT_DIR = Path(__file__).parent
 

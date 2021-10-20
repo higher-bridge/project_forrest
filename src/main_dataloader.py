@@ -15,15 +15,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-
+import numpy as np
 from utils.detection import (add_bpm_to_eyetracking, get_bpm_dict,
                              run_remodnav, split_into_chunks)
 from utils.file_management import (add_ID_column, get_list_of_files,
                                    load_and_concatenate_files,
                                    load_merged_files, write_to_tsv)
+from constants import SEED
 
 
 def main() -> None:
+    np.random.seed(SEED)
+
     # If not done before, concat files so each ID has one associated file instead of 8
     load_and_concatenate_files('eyetracking', '*physio.tsv')
     load_and_concatenate_files('heartrate', '*physio.tsv')
@@ -31,7 +34,9 @@ def main() -> None:
     # Load the merged files
     df_hr, ID_hr = load_merged_files('heartrate')
 
-    # Retrieve file names. Use if fixation extraction has not been done before
+    # Retrieve file names and run fixation detection with REMODNAV (takes several minutes. Number of CPU cores to use
+    # can be specified in constants.py).
+    # Use if fixation extraction has not been done before and/or if *-extracted.tsv files are not available
     files_et = get_list_of_files('eyetracking', '*-merged.tsv')
     results = run_remodnav(files_et)
 

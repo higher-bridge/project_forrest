@@ -62,12 +62,23 @@ def detect_heartrate(signal: List[Any]) -> List[float]:
 
 
 def split_into_chunks(df: pd.DataFrame, measurement_type: str) -> pd.DataFrame:
-    sampling_rate = HZ_HEART if measurement_type == 'heartrate' else HZ
+    if measurement_type == 'heartrate':
+        sampling_rate = HZ_HEART
+    elif measurement_type == 'eyetracking':
+        sampling_rate = HZ
+    elif measurement_type == 'normdiff':
+        sampling_rate = 250
+    else:
+        raise ValueError(f'split_into_chunks(): provide one of [heartrate, eyetracking, normdiff] as measurement_type.')
+
+    # sampling_rate = HZ_HEART if measurement_type == 'heartrate' else HZ
 
     if measurement_type == 'heartrate':
         timestamps = np.arange(0, len(df) / sampling_rate, 1 / sampling_rate)
-    else:
+    elif measurement_type == 'eyetracking':
         timestamps = [onset + duration for onset, duration in zip(list(df['onset']), list(df['duration']))]
+    else:
+        timestamps = list(df['onset'])
 
     chunks = []
     current_chunk = 1
@@ -117,6 +128,8 @@ def get_heartrate_metrics(df: pd.DataFrame, ID: str) -> pd.DataFrame:
     print(f'{ID}: Mean overall = {round(mean_overall, 2)} (SD = {round(sd_overall, 2)}, SE = {round(se_overall, 2)})')
 
     hr_label = []
+    hr_diff = []
+    hr_sd = []
 
     for hr in list(df['heartrate']):
         # Compute if heartrate is higher or lower than the overall mean +/- a number of standard deviations
@@ -127,7 +140,15 @@ def get_heartrate_metrics(df: pd.DataFrame, ID: str) -> pd.DataFrame:
         else:
             hr_label.append(0)  # In between / normal
 
+        # Compute relative difference between current heart rate and overall mean
+        hr_diff.append(hr / mean_overall)
+
+        # Compute how many SDs current heart rate is removed from mean
+        hr_sd.append((hr - mean_overall) / sd_overall)
+
     df['label_hr'] = hr_label
+    df['diff_hr'] = hr_diff
+    df['sd_hr'] = hr_sd
 
     return df
 

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pickle
 import seaborn as sns
 from matplotlib import rcParams
 from scipy.stats import ttest_1samp
@@ -128,7 +129,7 @@ def plot_heartrate_hist(df: pd.DataFrame) -> None:
     plt.show()
 
 
-def plot_heartrate_over_time(df: pd.DataFrame) -> None:
+def plot_heartrate_over_time(df: pd.DataFrame, feature: str = 'heartrate') -> None:
     f = plt.figure(figsize=(7.5, 10))
     axes = [f.add_subplot(8, 2, i + 1) for i in range(len(list(df['ID'].unique())))]
 
@@ -136,26 +137,26 @@ def plot_heartrate_over_time(df: pd.DataFrame) -> None:
         df_ = df.loc[df['ID'] == ID]
         df_ = df_.loc[df_['label'] == 'Fixation']
 
-        mean_hr = np.mean(df_['heartrate'])
-        sd_hr = np.std(df_['heartrate'])
+        mean_hr = np.mean(df_[feature])
+        sd_hr = np.std(df_[feature])
         top = mean_hr + (sd_hr * SD_DEV_THRESH)
         bottom = mean_hr - (sd_hr * SD_DEV_THRESH)
 
-        sns.lineplot(x='chunk', y='heartrate', data=df_, ax=axes[i],
+        sns.lineplot(x='chunk', y=feature, data=df_, ax=axes[i],
                      sort=False)
         axes[i].axhline(y=top, xmin=0, xmax=240, color='red', linestyle='--')
         axes[i].axhline(y=bottom, xmin=0, xmax=240, color='red', linestyle='--')
 
         # Set feature label only on first column
         if i % 2 == 0:
-            axes[i].set_ylabel('heartrate')
+            axes[i].set_ylabel(feature)
         else:
             axes[i].set_ylabel('')
 
         axes[i].set_xlabel('')
 
     plt.tight_layout()
-    save_path = ROOT_DIR / 'results' / 'plots' / 'heartrate_over_time.png'
+    save_path = ROOT_DIR / 'results' / 'plots' / f'{feature}_over_time.png'
     plt.savefig(save_path, dpi=600)
     plt.show()
 
@@ -211,4 +212,21 @@ def plot_gini_coefficients() -> None:
     plt.tight_layout()
     savepath = ROOT_DIR / 'results' / 'plots' / f'features_gini_{EXP_RED_STR}.png'
     plt.savefig(savepath, dpi=600)
+    plt.show()
+
+
+def plot_linear_predictions():
+    model, X, y, r2 = pickle.load(open(ROOT_DIR / 'results' / f'linear_estimator_{EXP_RED_STR}.p', 'rb'))
+    y_pred = model.predict(X)
+
+    plt.figure()
+    sns.scatterplot(x=y, y=y_pred, label=f'R2 = {r2}')
+
+    plt.xlabel('True heart rate')
+    plt.ylabel('Predicted heart rate')
+
+    limits = (50, 100)
+    plt.xlim(limits)
+    plt.ylim(limits)
+
     plt.show()

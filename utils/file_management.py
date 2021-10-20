@@ -60,7 +60,15 @@ def load_and_concatenate_files(measurement_type: str, filetype_arg: str = None) 
     print(f'Merging all files per ID with type "{measurement_type}"')
 
     for file_key in list(file_dict.keys()):
-        dfs = [pd.read_csv(f, sep='\t', header=None, encoding='utf-8') for f in file_dict[file_key]]
+        if measurement_type == 'normdiff':  # normdiff.tsv has headers
+            dfs = [pd.read_csv(f, sep='\t', encoding='utf-8') for f in file_dict[file_key]]
+
+            for df_prev, df in zip(dfs[:-1], dfs[1:]):
+                df.iloc[:, 0] += df_prev.iloc[-1, 0]
+
+        else:
+            dfs = [pd.read_csv(f, sep='\t', header=None, encoding='utf-8') for f in file_dict[file_key]]
+
         df = pd.concat(dfs)
 
         df_dict[file_key] = df
