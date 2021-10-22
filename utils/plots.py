@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from typing import List, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -24,7 +26,7 @@ import seaborn as sns
 from matplotlib import rcParams
 from scipy.stats import ttest_1samp
 
-from constants import EXP_RED_STR, IND_VARS, ROOT_DIR, SD_DEV_THRESH
+from constants import EXP_RED_STR, IND_VARS, ROOT_DIR, SD_DEV_THRESH, REGRESSION_POLY
 from utils.pipeline_helper import rename_features
 
 
@@ -215,8 +217,66 @@ def plot_gini_coefficients() -> None:
     plt.show()
 
 
-def plot_linear_predictions():
-    model, X, y, r2 = pickle.load(open(ROOT_DIR / 'results' / f'linear_estimator_{EXP_RED_STR}.p', 'rb'))
+def compute_subplot_layout(columns: int) -> Tuple[int, int]:
+    if columns % 4 == 0:
+        return int(columns / 4), 4
+    elif columns % 3 == 0:
+        return int(columns / 3), 3
+    else:
+        return int(columns / 2), 2
+
+
+def plot_linear_predictions() -> None:
+    model, X, y, column_names, r2 = pickle.load(
+        open(ROOT_DIR / 'results' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p', 'rb')
+    )
+
+    if model is None:
+        raise Warning('There was no best regression model.')
+
+    y_pred = model.predict(X)
+
+    palette = sns.color_palette()
+
+    f = plt.figure(figsize=(7.5, 10))
+    # rows, cols = compute_subplot_layout(len(column_names))
+    # axes = [f.add_subplot(rows, cols, i + 1) for i in range(len(column_names))]
+
+    # for i, col in enumerate(column_names):
+    rows, cols = compute_subplot_layout(X.shape[1])
+    axes = [f.add_subplot(rows, cols, i + 1) for i in range(X.shape[1])]
+
+    for i in range(X.shape[1]):
+        x = X[:, i]
+        x_lin = np.linspace(min(x), max(x), num=100)
+        coef = list(model.coef_)[i]
+        intc = model.intercept_
+        y_pred = [v * coef + intc for v in x_lin]
+        # sns.lineplot(x=x, y=y, ax=axes[i], color=palette[0])
+        sns.lineplot(x=x_lin, y=y_pred, ax=axes[i], color=palette[0], zorder=10)
+        # sns.scatterplot(x=x, y=y, ax=axes[i], color=palette[1])
+
+        # axes[i].set_xlabel(col)
+
+        if i % cols == 0:
+            axes[i].set_ylabel('Predicted heart rate')
+        else:
+            axes[i].set_ylabel('')
+
+        axes[i].set_ylim((50, 100))
+
+    f.tight_layout()
+    f.show()
+
+
+def plot_linear_predictions_scatter() -> None:
+    model, X, y, _, r2 = pickle.load(
+        open(ROOT_DIR / 'results' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p', 'rb')
+    )
+
+    if model is None:
+        raise Warning('There was no best regression model.')
+
     y_pred = model.predict(X)
 
     plt.figure()
@@ -229,4 +289,7 @@ def plot_linear_predictions():
     plt.xlim(limits)
     plt.ylim(limits)
 
+    plt.tight_layout()
+    plt.savefig(ROOT_DIR / 'results' / 'plots' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.png',
+                dpi=600)
     plt.show()

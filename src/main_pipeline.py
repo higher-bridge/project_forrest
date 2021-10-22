@@ -21,15 +21,15 @@ import pandas as pd
 from utils.file_management import load_merged_files, write_to_tsv
 from utils.pipeline_helper import (get_scores_and_parameters,
                                    group_by_chunks, run_model_preselection,
-                                   run_model_search, run_regression_model)
+                                   run_model_search, run_regression_model,
+                                   run_regression_model_per_participant)
 from utils.plots import (plot_feature_hist, plot_heartrate_hist,
                          plot_heartrate_over_time, plot_gini_coefficients,
-                         plot_linear_predictions)
+                         plot_linear_predictions, plot_linear_predictions_scatter)
 from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, SEED
 
 
 def main() -> None:
-    np.random.seed(SEED)
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
 
     # Group data and write to tsv
@@ -51,16 +51,18 @@ def main() -> None:
 
     # Model
     print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
-    run_model_preselection(dataframes_exploded)
-
-    run_model_search(dataframes_exploded)
-    get_scores_and_parameters()
-
-    # Plot results
-    plot_gini_coefficients()
+    # run_model_preselection(dataframes_exploded)
+    #
+    # run_model_search(dataframes_exploded)
+    # get_scores_and_parameters()
+    #
+    # # Plot results
+    # plot_gini_coefficients()
 
     run_regression_model(dataframes_exploded, y_feature='heartrate')
-    plot_linear_predictions()
+    plot_linear_predictions_scatter()
+
+    run_regression_model_per_participant(dataframes_exploded, IDs, y_feature='heartrate')
 
 
 main()

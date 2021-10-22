@@ -20,22 +20,24 @@ import pickle
 import random
 import time
 from itertools import repeat
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 
 import numpy as np
 import pandas as pd
+from scipy.stats import scoreatpercentile
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, LinearRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GridSearchCV, train_test_split, RandomizedSearchCV
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import LabelBinarizer, StandardScaler
+from sklearn.preprocessing import LabelBinarizer, StandardScaler, PolynomialFeatures
 from sklearn.utils import shuffle
 
 from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, HYPERPARAMS, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
-                       USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, N_JOBS, HYPERPARAMETER_SAMPLES)
+                       USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, N_JOBS, HYPERPARAMETER_SAMPLES,
+                       REGRESSION_POLY, REGRESSION_POLY_DEG, SEED, REGRESSION_TEST_SIZE)
 from utils.statistical_features import stat_features
 from utils.scenediff_helper import get_scenediffs
 
@@ -217,6 +219,34 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
     return X_train_new, X_test_new, column_names
 
 
+def remove_outliers(x: np.array, y: List[Any]) -> Tuple[np.array, np.array]:
+    num_rows = x.shape[0]
+    for i in range(x.shape[1]):
+        # Select column
+        x_ = x[:, i]
+
+        # Get tenth and ninetieth percentiles
+        low = scoreatpercentile(x_, 1)
+        high = scoreatpercentile(x_, 99)
+
+        # Find where data in x_ is outside percentiles and set those to np.nan
+        mask = np.where((x_ < low) | (x_ > high))
+        x_[mask] = np.nan
+
+        # Now fill the column in the original array with the new data
+        x[:, i] = x_
+
+    # Find indices where at least one value is NaN and drop from x and y
+    keep_rows = ~np.isnan(x).any(axis=1)
+    x = x[keep_rows]
+    y = np.array(y)[keep_rows]
+
+    # dropped_perc = round((1 - x.shape[0] / num_rows) * 100, 2)
+    # print(f'Outlier removal dropped {dropped_perc}% of data')
+
+    return x, y
+
+
 def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
                                             Tuple[np.array, np.array],
                                             List[str]]:
@@ -225,17 +255,17 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
     df = df.loc[df['label_hr'] != 'normal']
 
     y_ = list(df['label_hr'])
+    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr', 'chunk'], axis=1)
+    column_names = X_base.columns
+
+    X_base, y_ = remove_outliers(np.array(X_base), y_)
     y = LabelBinarizer().fit_transform(y_).ravel()
     indices = np.arange(len(y_))
-
-    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr', 'chunk'], axis=1)
 
     # Retrieve a train/test split
     X_train, X_test, y_train, y_test, train_ind, test_ind = train_test_split(X_base, y, indices,
                                                                              test_size=TEST_SIZE,
                                                                              stratify=y)
-
-    column_names = X_train.columns
 
     if USE_FEATURE_EXPLOSION and USE_FEATURE_REDUCTION:
         X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
@@ -256,31 +286,38 @@ def prepare_data_continuous(df: pd.DataFrame, y_feature: str = 'heartrate') -> T
     # Get heartrates
     y = list(df[y_feature])
 
-    # Retrieve a train/test split
-    indices = list(np.arange(len(y)))
-    train_samples = int((1 - TEST_SIZE) * len(y))
-
-    indices_shuffled = shuffle(indices)
-    train_ind = indices_shuffled[0:train_samples]
-    test_ind = indices_shuffled[train_samples:-1]
-
     X_base = df.drop(['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr', 'chunk'], axis=1)
     column_names = list(X_base.columns)
 
     X = np.array(X_base)
+    X, y = remove_outliers(X, y)
+
+    # Retrieve a train/test split. We can't use sklearn train_test_split because y is a continuous variable
+    indices = list(np.arange(len(y)))
+    indices_shuffled = shuffle(indices)
+
+    train_samples = int((1 - REGRESSION_TEST_SIZE) * len(y))
+    train_ind = indices_shuffled[0:train_samples]
+    test_ind = indices_shuffled[train_samples:-1]
+
     X_train, X_test = X[train_ind], X[test_ind]
-    y_train, y_test = np.array(y)[train_ind], np.array(y)[test_ind]
+    y_train, y_test = y[train_ind], y[test_ind]
 
     if USE_FEATURE_EXPLOSION and USE_FEATURE_REDUCTION:
         X_train = pd.DataFrame(X_train, columns=column_names)
         X_test = pd.DataFrame(X_test, columns=column_names)
         X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
 
-    s = StandardScaler()
-    X_train_scaled = s.fit_transform(X_train)
-    X_test_scaled = s.transform(X_test)
+    if REGRESSION_POLY:
+        pf = PolynomialFeatures(degree=REGRESSION_POLY_DEG, include_bias=False)
+        X_train = pf.fit_transform(X_train)
+        X_test = pf.transform(X_test)
+    # else:
+    #     s = StandardScaler()
+    #     X_train = s.fit_transform(X_train)
+    #     X_test = s.transform(X_test)
 
-    return (X_train_scaled, X_test_scaled), (y_train, y_test), column_names
+    return (X_train, X_test), (y_train, y_test), column_names
 
 
 def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[RandomizedSearchCV, float, str, List[str]]:
@@ -310,6 +347,7 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[Ran
 
 
 def run_model_search(dataframes: List[pd.DataFrame]) -> None:
+    np.random.seed(SEED)
     df = pd.concat(dataframes)
     get_data_stats(df)
 
@@ -358,6 +396,7 @@ def run_model_search(dataframes: List[pd.DataFrame]) -> None:
 
 
 def run_model_preselection(dataframes: List[pd.DataFrame]) -> None:
+    np.random.seed(SEED)
     df = pd.concat(dataframes)
     get_data_stats(df)
 
@@ -435,6 +474,7 @@ def get_scores_and_parameters() -> None:
 
 
 def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heartrate') -> None:
+    np.random.seed(SEED)
     df = pd.concat(dataframes)
     get_data_stats(df)
 
@@ -442,8 +482,8 @@ def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heart
     test_r2 = []
     coefs = []
 
-    best_model = [None, None, None, None]
-    best_model_score = 0
+    best_model = [None, None, None, None, None]
+    best_model_score = -1e10
 
     # Do multiple independent runs in order to get a good average performance metric
     for attempt in range(50):
@@ -459,7 +499,7 @@ def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heart
 
         if test_score > best_model_score:
             best_model_score = test_score
-            best_model = [model, X_test, y_test, round(test_score, 2)]
+            best_model = [model, X_test, y_test, column_names, round(test_score, 2)]
 
     r2_train = round(np.mean(train_r2), 2)
     r2_test = round(np.mean(test_r2), 2)
@@ -469,8 +509,100 @@ def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heart
     to_write = f'Linear regression (50 runs) mean R-squared on train set = {r2_train} (SD = {r2_train_sd}). ' \
                f'Mean R-squared on test set = {r2_test} (SD = {r2_test_sd}). ' \
                f'Best = {round(best_model_score, 2)}.'
-    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_{EXP_RED_STR}.txt', 'w') as wf:
+    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.txt',
+              'w') as wf:
         wf.write(to_write)
     print(to_write, '\n')
 
-    pickle.dump(best_model, open(ROOT_DIR / 'results' / f'linear_estimator_{EXP_RED_STR}.p', 'wb'))
+    pickle.dump(best_model, open(ROOT_DIR / 'results' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p',
+                                 'wb'))
+
+
+def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs, y_feature: str = 'heartrate') -> None:
+    np.random.seed(SEED)
+
+    ID_dict = {ID: dict() for ID in IDs}
+    write_text = ''
+
+    for df, ID in zip(dataframes, IDs):
+        train_r2 = []
+        test_r2 = []
+        coefs = []
+
+        best_model = [None, None, None, None, None]
+        best_model_score = -1e10
+
+        # Do multiple independent runs in order to get a good average performance metric
+        for attempt in range(50):
+            (X, X_test), (y, y_test), column_names = prepare_data_continuous(df, y_feature)
+
+            model = LinearRegression()
+            model.fit(X, y)
+            test_score = model.score(X_test, y_test)
+
+            train_r2.append(model.score(X, y))
+            test_r2.append(test_score)
+            coefs.append(model.coef_)
+
+            if test_score > best_model_score:
+                best_model_score = test_score
+                best_model = [model, X_test, y_test, column_names, round(test_score, 2)]
+
+        r2_train = round(np.mean(train_r2), 2)
+        r2_test = round(np.mean(test_r2), 2)
+        r2_train_sd = round(np.std(train_r2), 2)
+        r2_test_sd = round(np.std(test_r2), 2)
+        train_samples = len(y)
+        test_samples = len(y_test)
+
+        to_write = f'\n{ID}:' \
+                   f'Linear regression (50 runs) mean R-squared on train set = {r2_train} (SD = {r2_train_sd}). ' \
+                   f'Mean R-squared on test set = {r2_test} (SD = {r2_test_sd}). ' \
+                   f'Best = {round(best_model_score, 2)}.' \
+                   f'({train_samples}/{test_samples} train/test samples)'
+        write_text += to_write
+        print(to_write)
+
+        ID_dict[ID]['Best model'] = best_model
+        ID_dict[ID]['R2 train mean'] = r2_train
+        ID_dict[ID]['R2 train sd'] = r2_train_sd
+        ID_dict[ID]['R2 test mean'] = r2_test
+        ID_dict[ID]['R2 test sd'] = r2_test_sd
+
+    regr_stats = compute_regression_stats(ID_dict)
+    write_text += regr_stats
+
+    with open(
+            ROOT_DIR / 'results' / f'linear_estimator_performance_per_participant_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.txt',
+            'w') as wf:
+        wf.write(write_text)
+
+    pickle.dump(ID_dict,
+                open(
+                    ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p',
+                    'wb'
+                )
+                )
+
+
+def compute_regression_stats(ID_dict: Dict[str, Dict[str, Any]] = None) -> str:
+    if ID_dict is None:
+        ID_dict = pickle.load(open(
+            ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p',
+            'wb'))
+
+    means_train = []
+    means_test = []
+
+    for ID in list(ID_dict.keys()):
+        idd = ID_dict[ID]
+        means_train.append(idd['R2 train mean'])
+        means_test.append(idd['R2 test mean'])
+
+    mean_train = round(np.mean(means_train), 2)
+    mean_test = round(np.mean(means_test), 2)
+
+    to_write = f'\nMean R-squared on training = {mean_train}, testing = {mean_test}'
+    print(to_write)
+
+    return to_write

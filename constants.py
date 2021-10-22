@@ -48,6 +48,10 @@ USE_FEATURE_EXPLOSION = False
 USE_FEATURE_REDUCTION = False
 DIMENSIONS_PER_FEATURE = 2
 
+REGRESSION_TEST_SIZE = .20
+REGRESSION_POLY = True  # Indicate whether to use polynomial regression
+REGRESSION_POLY_DEG = 2
+
 # String to help with writing files, no need to touch
 EXP_RED_STR = f'EXP_{1 if USE_FEATURE_EXPLOSION else 0}_RED_{1 if USE_FEATURE_REDUCTION else 0}'
 
