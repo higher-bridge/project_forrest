@@ -15,7 +15,7 @@ Alex J. Hoogerbrugge, Zoril A. Oláh, Edwin S. Dalmaijer, Christoph Strauch, Tan
 #### Reproducibility
 - A seed value of 42 is set for numpy in ```constants.py```.
 - All relevant output values, matching those in the manuscript, should be included in the repository. ```EXP_[0/1]_RED[0/1]``` indicate whether feature explosion and dimensionality reduction were applied to achieve this outcome measure (0 = False, 1 = True).
-- I have attempted to include the correct environment to exactly reproduce the results. Install with [Anaconda](https://www.anaconda.com/): ```conda install --name ENV_NAME --file environment.yml```.
+- I have attempted to include the correct environment to exactly reproduce the results. Install with [Anaconda](https://www.anaconda.com/): ```conda install --name ENV_NAME --file environment.yml``` or ```conda env install --name ENV_NAME --file environment.yml```.
 - I run a Ryzen 5 3600 on a UNIX-based OS (with noMKL), and have not been able to test this extensively on different systems and CPUs.
 - Nonetheless, the versions of the most important packages (e.g., scikit-learn) are equal. Please let me know if you cannot reproduce the results. 
 #### Code
@@ -29,3 +29,21 @@ Alex J. Hoogerbrugge, Zoril A. Oláh, Edwin S. Dalmaijer, Christoph Strauch, Tan
 
 ### Known issues
 * The Gini impurity plot currently does not work with feature explosion.
+
+
+### Reproducibility in case of failed environment build
+It may happen that the conda environment cannot be installed. Below are listed the most important packages and their versions (as described in environment.yml). Please note, however, that differing operating systems, system variables, or hardware may still result in differing outcomes. Nonetheless, due to the procedure of repeating all models where randomness is applied, results should still be fairly similar to those reported in the manuscript.
+
+conda:
+- python==3.8.10
+- numpy==1.20.3
+- pandas==1.3.1
+- scikit-learn==0.24.2
+- scipy==1.6.2
+- matplotlib==3.4.2
+- seaborn==0.11.1
+
+pip:
+- heartpy==1.2.7
+- remodnav==1.0
+- statsmodels==0.12.2
