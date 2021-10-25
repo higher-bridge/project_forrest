@@ -26,7 +26,7 @@ import seaborn as sns
 from matplotlib import rcParams
 from scipy.stats import ttest_1samp
 
-from constants import EXP_RED_STR, IND_VARS, ROOT_DIR, SD_DEV_THRESH, REGRESSION_POLY
+from constants import EXP_RED_STR, IND_VARS, ROOT_DIR, SD_DEV_THRESH, REGRESSION_POLY_DEG
 from utils.pipeline_helper import rename_features
 
 
@@ -228,7 +228,7 @@ def compute_subplot_layout(columns: int) -> Tuple[int, int]:
 
 def plot_linear_predictions() -> None:
     model, X, y, column_names, r2 = pickle.load(
-        open(ROOT_DIR / 'results' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p', 'rb')
+        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p', 'rb')
     )
 
     if model is None:
@@ -271,7 +271,7 @@ def plot_linear_predictions() -> None:
 
 def plot_linear_predictions_scatter() -> None:
     model, X, y, _, r2 = pickle.load(
-        open(ROOT_DIR / 'results' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p', 'rb')
+        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p', 'rb')
     )
 
     if model is None:
@@ -290,6 +290,6 @@ def plot_linear_predictions_scatter() -> None:
     plt.ylim(limits)
 
     plt.tight_layout()
-    plt.savefig(ROOT_DIR / 'results' / 'plots' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.png',
+    plt.savefig(ROOT_DIR / 'results' / 'plots' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.png',
                 dpi=600)
     plt.show()

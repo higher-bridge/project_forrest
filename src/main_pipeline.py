@@ -29,40 +29,56 @@ from utils.plots import (plot_feature_hist, plot_heartrate_hist,
 from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, SEED
 
 
-def main() -> None:
+def main(group: bool = False,
+         plot: bool = True,
+         process: bool = True,
+         preselection: bool = True,
+         search: bool = True,
+         regression: bool = True) -> None:
+
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
 
     # Group data and write to tsv
-    # dataframes_grouped = group_by_chunks(dataframes, flatten=False)
-    # write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
+    if group:
+        dataframes_grouped = group_by_chunks(dataframes, flatten=False)
+        write_to_tsv(dataframes_grouped, IDs, suffix='-grouped.tsv')
 
     # Combine all dataframes into one big dataframe and plot
-    # combined_df = pd.concat(dataframes_grouped)
-    # plot_feature_hist(combined_df)
-    # plot_heartrate_hist(combined_df)
-    # plot_heartrate_over_time(combined_df, feature='heartrate')
+    if plot:
+        dataframes_grouped = group_by_chunks(dataframes, flatten=False)
+        combined_df = pd.concat(dataframes_grouped)
+        plot_feature_hist(combined_df)
+        plot_heartrate_hist(combined_df)
+        plot_heartrate_over_time(combined_df, feature='heartrate')
 
     # Pre-process data
-    dataframes_exploded = group_by_chunks(dataframes, flatten=True)
-    write_to_tsv(dataframes_exploded, IDs, 'eyetracking', '-exploded.tsv')
+    if process:
+        dataframes_exploded = group_by_chunks(dataframes, flatten=True)
+        write_to_tsv(dataframes_exploded, IDs, 'eyetracking', '-exploded.tsv')
 
     # Or load the pre-processed data if available
-    # dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
+    else:
+        dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
 
     # Model
     print(f'Running models with EXPLOSION={USE_FEATURE_EXPLOSION}, REDUCTION={USE_FEATURE_REDUCTION}.')
-    # run_model_preselection(dataframes_exploded)
-    #
-    # run_model_search(dataframes_exploded)
-    # get_scores_and_parameters()
-    #
-    # # Plot results
-    # plot_gini_coefficients()
+    if preselection:
+        run_model_preselection(dataframes_exploded)
 
-    run_regression_model(dataframes_exploded, y_feature='heartrate')
-    plot_linear_predictions_scatter()
+    if search:
+        run_model_search(dataframes_exploded)
+        get_scores_and_parameters()
 
-    run_regression_model_per_participant(dataframes_exploded, IDs, y_feature='heartrate')
+        # Plot results
+        try:
+            plot_gini_coefficients()
+        except:
+            print('Could not plot gini coefficients')
+
+    if regression:
+        run_regression_model(dataframes_exploded, y_feature='heartrate')
+        plot_linear_predictions_scatter()
+        run_regression_model_per_participant(dataframes_exploded, IDs, y_feature='heartrate')
 
 
 main()

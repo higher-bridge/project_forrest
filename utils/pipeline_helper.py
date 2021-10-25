@@ -37,7 +37,7 @@ from sklearn.utils import shuffle
 from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, HYPERPARAMS, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
                        USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, N_JOBS, HYPERPARAMETER_SAMPLES,
-                       REGRESSION_POLY, REGRESSION_POLY_DEG, SEED, REGRESSION_TEST_SIZE)
+                       REGRESSION_POLY_DEG, SEED, REGRESSION_TEST_SIZE)
 from utils.statistical_features import stat_features
 from utils.scenediff_helper import get_scenediffs
 
@@ -84,9 +84,7 @@ def rename_features(x: str) -> str:
         return x
 
 
-def group_by_chunks(dfs: List[pd.DataFrame],
-                    feature_explosion: bool = USE_FEATURE_EXPLOSION,
-                    flatten: bool = True) -> List[pd.DataFrame]:
+def group_by_chunks(dfs: List[pd.DataFrame], flatten: bool = True) -> List[pd.DataFrame]:
     # scene_diffs = list(get_scenediffs()['norm_diff'])
 
     new_dfs = []
@@ -95,7 +93,9 @@ def group_by_chunks(dfs: List[pd.DataFrame],
         ID = list(df['ID'])[0]
 
         # Rename eye movement types (e.g. FIXA to Fixation) and remove NA
-        df['label'] = df['label'].apply(rename_types)
+        if 'FIXA' in list(df['label'].unique()):
+            df['label'] = df['label'].apply(rename_types)
+
         df = df.loc[df['label'] != 'NA']
 
         # Drop data where heartrate = 0 (usually last chunk)
@@ -108,7 +108,7 @@ def group_by_chunks(dfs: List[pd.DataFrame],
         df_counts = df.groupby(['chunk', 'label']).agg(['count', 'mean']).reset_index()
 
         # Aggregate, either by mean or with statistical descriptors
-        if not feature_explosion:
+        if not USE_FEATURE_EXPLOSION:
             df_agg = df.groupby(['chunk', 'label']).agg({feat: np.nanmean for feat in IND_VARS}).reset_index()
         else:
             df_agg = df.groupby(['chunk', 'label']).agg({feat: stat_features for feat in IND_VARS}).reset_index()
@@ -292,7 +292,7 @@ def prepare_data_continuous(df: pd.DataFrame, y_feature: str = 'heartrate') -> T
     X = np.array(X_base)
     X, y = remove_outliers(X, y)
 
-    # Retrieve a train/test split. We can't use sklearn train_test_split because y is a continuous variable
+    # Retrieve a train/test split. We can't use sklearn's train_test_split because y is a continuous variable
     indices = list(np.arange(len(y)))
     indices_shuffled = shuffle(indices)
 
@@ -308,7 +308,7 @@ def prepare_data_continuous(df: pd.DataFrame, y_feature: str = 'heartrate') -> T
         X_test = pd.DataFrame(X_test, columns=column_names)
         X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
 
-    if REGRESSION_POLY:
+    if REGRESSION_POLY_DEG > 1:
         pf = PolynomialFeatures(degree=REGRESSION_POLY_DEG, include_bias=False)
         X_train = pf.fit_transform(X_train)
         X_test = pf.transform(X_test)
@@ -509,12 +509,12 @@ def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heart
     to_write = f'Linear regression (50 runs) mean R-squared on train set = {r2_train} (SD = {r2_train_sd}). ' \
                f'Mean R-squared on test set = {r2_test} (SD = {r2_test_sd}). ' \
                f'Best = {round(best_model_score, 2)}.'
-    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.txt',
+    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.txt',
               'w') as wf:
         wf.write(to_write)
     print(to_write, '\n')
 
-    pickle.dump(best_model, open(ROOT_DIR / 'results' / f'linear_estimator_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p',
+    pickle.dump(best_model, open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p',
                                  'wb'))
 
 
@@ -573,13 +573,13 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs, y_
     write_text += regr_stats
 
     with open(
-            ROOT_DIR / 'results' / f'linear_estimator_performance_per_participant_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.txt',
+            ROOT_DIR / 'results' / f'linear_estimator_performance_per_participant_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.txt',
             'w') as wf:
         wf.write(write_text)
 
     pickle.dump(ID_dict,
                 open(
-                    ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p',
+                    ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p',
                     'wb'
                 )
                 )
@@ -588,7 +588,7 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs, y_
 def compute_regression_stats(ID_dict: Dict[str, Dict[str, Any]] = None) -> str:
     if ID_dict is None:
         ID_dict = pickle.load(open(
-            ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLY_{int(REGRESSION_POLY)}_{EXP_RED_STR}.p',
+            ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p',
             'wb'))
 
     means_train = []
