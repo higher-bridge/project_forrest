@@ -41,18 +41,22 @@ HYPERPARAMS['n_estimators'] = list(np.arange(10, 160, step=1))
 HYPERPARAMS['max_depth'] = list(np.arange(1, 21, step=1)) + [None]
 HYPERPARAMS['max_features'] = list(np.arange(1, 16, step=1))
 
+# Train/test split sizes
 TEST_SIZE = .20
-HYPERPARAMETER_SAMPLES = 1000  # Set how often to sample the hyperparameter distributions in each iteration
-SEARCH_ITERATIONS = 50  # Set how often to re-run the grid search
+REGRESSION_TEST_SIZE = .20
+
+# Model search parameters
+HYPERPARAMETER_SAMPLES = 10  # Set how often to sample the hyperparameter distributions in each iteration
+SEARCH_ITERATIONS = 3  # Set how often to re-run the grid search
+
+# Mind that the following features can be overridden if specified as a main() argument in main_pipeline.py
 USE_FEATURE_EXPLOSION = False
 USE_FEATURE_REDUCTION = False
+
 DIMENSIONS_PER_FEATURE = 2
 
-REGRESSION_TEST_SIZE = .20
+# Mind that the following feature can also be overridden if specified as a main() argument in main_pipeline.py
 REGRESSION_POLY_DEG = 2  # Indicate whether to use polynomial regression and to which degree (1 = No polynomials)
-
-# String to help with writing files, no need to touch
-EXP_RED_STR = f'EXP_{1 if USE_FEATURE_EXPLOSION else 0}_RED_{1 if USE_FEATURE_REDUCTION else 0}'
 
 # Matplotlib (plotting) parameters
 rcParams['font.family'] = 'sans-serif'

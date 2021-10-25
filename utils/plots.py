@@ -26,7 +26,7 @@ import seaborn as sns
 from matplotlib import rcParams
 from scipy.stats import ttest_1samp
 
-from constants import EXP_RED_STR, IND_VARS, ROOT_DIR, SD_DEV_THRESH, REGRESSION_POLY_DEG
+from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH
 from utils.pipeline_helper import rename_features
 
 
@@ -173,8 +173,8 @@ def test_if_significant_from_mean(values: pd.Series, overall_mean: np.array) -> 
         return False
 
 
-def plot_gini_coefficients() -> None:
-    path = ROOT_DIR / 'results' / f'best_estimator_importances_{EXP_RED_STR}.csv'
+def plot_gini_coefficients(feature_explosion: bool, feature_reduction: bool,) -> None:
+    path = ROOT_DIR / 'results' / f'best_estimator_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv'
     df = pd.read_csv(path)
     df = df.drop(['Unnamed: 0'], axis=1)
 
@@ -212,7 +212,7 @@ def plot_gini_coefficients() -> None:
                      fontsize=13)
 
     plt.tight_layout()
-    savepath = ROOT_DIR / 'results' / 'plots' / f'features_gini_{EXP_RED_STR}.png'
+    savepath = ROOT_DIR / 'results' / 'plots' / f'features_gini_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png'
     plt.savefig(savepath, dpi=600)
     plt.show()
 
@@ -226,9 +226,9 @@ def compute_subplot_layout(columns: int) -> Tuple[int, int]:
         return int(columns / 2), 2
 
 
-def plot_linear_predictions() -> None:
+def plot_linear_predictions(feature_explosion: bool, feature_reduction: bool, poly_deg: int) -> None:
     model, X, y, column_names, r2 = pickle.load(
-        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p', 'rb')
+        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{poly_deg}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p', 'rb')
     )
 
     if model is None:
@@ -269,9 +269,9 @@ def plot_linear_predictions() -> None:
     f.show()
 
 
-def plot_linear_predictions_scatter() -> None:
+def plot_linear_predictions_scatter(feature_explosion: bool, feature_reduction: bool, poly_deg) -> None:
     model, X, y, _, r2 = pickle.load(
-        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p', 'rb')
+        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{poly_deg}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p', 'rb')
     )
 
     if model is None:
@@ -290,6 +290,6 @@ def plot_linear_predictions_scatter() -> None:
     plt.ylim(limits)
 
     plt.tight_layout()
-    plt.savefig(ROOT_DIR / 'results' / 'plots' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.png',
+    plt.savefig(ROOT_DIR / 'results' / 'plots' / f'linear_estimator_POLYDEG_{poly_deg}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png',
                 dpi=600)
     plt.show()

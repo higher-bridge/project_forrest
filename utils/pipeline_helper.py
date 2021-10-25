@@ -34,10 +34,10 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler, PolynomialFeatures
 from sklearn.utils import shuffle
 
-from constants import (DIMENSIONS_PER_FEATURE, EXP_RED_STR, HYPERPARAMS, IND_VARS,
+from constants import (DIMENSIONS_PER_FEATURE, HYPERPARAMS, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
-                       USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, N_JOBS, HYPERPARAMETER_SAMPLES,
-                       REGRESSION_POLY_DEG, SEED, REGRESSION_TEST_SIZE)
+                       N_JOBS, HYPERPARAMETER_SAMPLES,
+                       SEED, REGRESSION_TEST_SIZE)
 from utils.statistical_features import stat_features
 from utils.scenediff_helper import get_scenediffs
 
@@ -84,7 +84,7 @@ def rename_features(x: str) -> str:
         return x
 
 
-def group_by_chunks(dfs: List[pd.DataFrame], flatten: bool = True) -> List[pd.DataFrame]:
+def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: bool = True) -> List[pd.DataFrame]:
     # scene_diffs = list(get_scenediffs()['norm_diff'])
 
     new_dfs = []
@@ -108,7 +108,7 @@ def group_by_chunks(dfs: List[pd.DataFrame], flatten: bool = True) -> List[pd.Da
         df_counts = df.groupby(['chunk', 'label']).agg(['count', 'mean']).reset_index()
 
         # Aggregate, either by mean or with statistical descriptors
-        if not USE_FEATURE_EXPLOSION:
+        if not feature_explosion:
             df_agg = df.groupby(['chunk', 'label']).agg({feat: np.nanmean for feat in IND_VARS}).reset_index()
         else:
             df_agg = df.groupby(['chunk', 'label']).agg({feat: stat_features for feat in IND_VARS}).reset_index()
@@ -247,9 +247,10 @@ def remove_outliers(x: np.array, y: List[Any]) -> Tuple[np.array, np.array]:
     return x, y
 
 
-def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
-                                            Tuple[np.array, np.array],
-                                            List[str]]:
+def prepare_data(df: pd.DataFrame,
+                 feature_explosion: bool, feature_reduction: bool) -> Tuple[Tuple[np.array, np.array],
+                                                                            Tuple[np.array, np.array],
+                                                                            List[str]]:
     # Drop NANs and remove data where label is not high or low
     df = df.dropna()
     df = df.loc[df['label_hr'] != 'normal']
@@ -267,7 +268,9 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
                                                                              test_size=TEST_SIZE,
                                                                              stratify=y)
 
-    if USE_FEATURE_EXPLOSION and USE_FEATURE_REDUCTION:
+    if feature_explosion and feature_reduction:
+        X_train = pd.DataFrame(X_train, columns=column_names)
+        X_test = pd.DataFrame(X_test, columns=column_names)
         X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
 
     s = StandardScaler()
@@ -277,9 +280,12 @@ def prepare_data(df: pd.DataFrame) -> Tuple[Tuple[np.array, np.array],
     return (X_train_scaled, X_test_scaled), (y_train, y_test), column_names
 
 
-def prepare_data_continuous(df: pd.DataFrame, y_feature: str = 'heartrate') -> Tuple[Tuple[np.array, np.array],
-                                                                                     Tuple[np.array, np.array],
-                                                                                     List[str]]:
+def prepare_data_continuous(df: pd.DataFrame,
+                            feature_explosion: bool, feature_reduction: bool,
+                            poly_degree: int,
+                            y_feature: str = 'heartrate') -> Tuple[Tuple[np.array, np.array],
+                                                                   Tuple[np.array, np.array],
+                                                                   List[str]]:
     # Drop NANs
     df = df.dropna()
 
@@ -303,13 +309,13 @@ def prepare_data_continuous(df: pd.DataFrame, y_feature: str = 'heartrate') -> T
     X_train, X_test = X[train_ind], X[test_ind]
     y_train, y_test = y[train_ind], y[test_ind]
 
-    if USE_FEATURE_EXPLOSION and USE_FEATURE_REDUCTION:
+    if feature_explosion and feature_reduction:
         X_train = pd.DataFrame(X_train, columns=column_names)
         X_test = pd.DataFrame(X_test, columns=column_names)
         X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
 
-    if REGRESSION_POLY_DEG > 1:
-        pf = PolynomialFeatures(degree=REGRESSION_POLY_DEG, include_bias=False)
+    if poly_degree > 1:
+        pf = PolynomialFeatures(degree=poly_degree, include_bias=False)
         X_train = pf.fit_transform(X_train)
         X_test = pf.transform(X_test)
     # else:
@@ -320,9 +326,15 @@ def prepare_data_continuous(df: pd.DataFrame, y_feature: str = 'heartrate') -> T
     return (X_train, X_test), (y_train, y_test), column_names
 
 
-def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[RandomizedSearchCV, float, str, List[str]]:
+def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int,
+                               feature_explosion: bool, feature_reduction: bool) -> Tuple[RandomizedSearchCV,
+                                                                                          float,
+                                                                                          str,
+                                                                                          List[str]]:
     print(f'\nIteration {iteration_nr + 1}:')
-    (X, X_test), (y, y_test), column_names = prepare_data(df)
+    (X, X_test), (y, y_test), column_names = prepare_data(df,
+                                                          feature_explosion=feature_explosion,
+                                                          feature_reduction=feature_reduction)
 
     # Run a grid search with the specified hyperparameters
     start = time.time()
@@ -346,7 +358,8 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int) -> Tuple[Ran
     return param_search, test_score, to_write, column_names
 
 
-def run_model_search(dataframes: List[pd.DataFrame]) -> None:
+def run_model_search(dataframes: List[pd.DataFrame],
+                     feature_explosion: bool, feature_reduction: bool) -> None:
     np.random.seed(SEED)
     df = pd.concat(dataframes)
     get_data_stats(df)
@@ -359,7 +372,10 @@ def run_model_search(dataframes: List[pd.DataFrame]) -> None:
     gini_coefficients = pd.DataFrame()
 
     for i in range(SEARCH_ITERATIONS):
-        grid_search, test_score, to_write, column_names = run_model_search_iteration(df, i)
+        grid_search, test_score, to_write, column_names = run_model_search_iteration(df, i,
+                                                                                     feature_explosion=feature_explosion,
+                                                                                     feature_reduction=feature_reduction,
+                                                                                     )
 
         best_estimators.append(grid_search.best_estimator_)
         test_scores.append(test_score)
@@ -381,21 +397,22 @@ def run_model_search(dataframes: List[pd.DataFrame]) -> None:
           f'{round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)})')
 
     # Write performance in text
-    with open(ROOT_DIR / 'results' / f'model_performance_{EXP_RED_STR}.txt', 'w') as wf:
+    with open(ROOT_DIR / 'results' / f'model_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt', 'w') as wf:
         wf.write(text_results)
 
     # Save cross-validation results
     cv_results['overfit_factor'] = cv_results['mean_train_score'] / cv_results['mean_test_score']
-    cv_results.to_csv(ROOT_DIR / 'results' / f'cv_results_{EXP_RED_STR}.csv')
+    cv_results.to_csv(ROOT_DIR / 'results' / f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save the gini coefficients
-    gini_coefficients.to_csv(ROOT_DIR / 'results' / f'best_estimator_importances_{EXP_RED_STR}.csv')
+    gini_coefficients.to_csv(ROOT_DIR / 'results' / f'best_estimator_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save best estimators to pickle
-    pickle.dump(best_estimators, open(ROOT_DIR / 'results' / f'best_estimator_{EXP_RED_STR}.p', 'wb'))
+    pickle.dump(best_estimators, open(ROOT_DIR / 'results' / f'best_estimator_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p', 'wb'))
 
 
-def run_model_preselection(dataframes: List[pd.DataFrame]) -> None:
+def run_model_preselection(dataframes: List[pd.DataFrame],
+                           feature_explosion: bool, feature_reduction: bool) -> None:
     np.random.seed(SEED)
     df = pd.concat(dataframes)
     get_data_stats(df)
@@ -407,7 +424,9 @@ def run_model_preselection(dataframes: List[pd.DataFrame]) -> None:
 
     # Do multiple independent runs in order to get a good average performance metric
     for attempt in range(50):
-        (X, X_test), (y, y_test), column_names = prepare_data(df)
+        (X, X_test), (y, y_test), column_names = prepare_data(df,
+                                                              feature_explosion=feature_explosion,
+                                                              feature_reduction=feature_reduction)
 
         if attempt == 0:
             print(f'Train set: {len(X)} values. Test set: {len(X_test)} values.')
@@ -438,13 +457,13 @@ def run_model_preselection(dataframes: List[pd.DataFrame]) -> None:
         to_write += f'Training mean score = {round(np.mean(train_scores), 3)} (SD = {round(np.std(train_scores), 3)}). '
         to_write += f'Testing mean score  = {round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)}).'
 
-    with open(ROOT_DIR / 'results' / f'model_preliminary_performance_{EXP_RED_STR}.txt', 'w') as wf:
+    with open(ROOT_DIR / 'results' / f'model_preliminary_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt', 'w') as wf:
         wf.write(to_write)
     print(to_write, '\n')
 
 
-def get_scores_and_parameters() -> None:
-    path = ROOT_DIR / 'results' / f'cv_results_{EXP_RED_STR}.csv'
+def get_scores_and_parameters(feature_explosion: bool, feature_reduction: bool,) -> None:
+    path = ROOT_DIR / 'results' / f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv'
     df = pd.read_csv(path)
 
     num_iterations = list(df['Iteration'].unique())
@@ -473,7 +492,10 @@ def get_scores_and_parameters() -> None:
               f'Feat {round(np.mean(feats_list), 3)}')
 
 
-def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heartrate') -> None:
+def run_regression_model(dataframes: List[pd.DataFrame],
+                         feature_explosion: bool, feature_reduction: bool,
+                         poly_degree: int,
+                         y_feature: str = 'heartrate') -> None:
     np.random.seed(SEED)
     df = pd.concat(dataframes)
     get_data_stats(df)
@@ -487,7 +509,11 @@ def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heart
 
     # Do multiple independent runs in order to get a good average performance metric
     for attempt in range(50):
-        (X, X_test), (y, y_test), column_names = prepare_data_continuous(df, y_feature)
+        (X, X_test), (y, y_test), column_names = prepare_data_continuous(df,
+                                                                         feature_explosion=feature_explosion,
+                                                                         feature_reduction=feature_reduction,
+                                                                         poly_degree=poly_degree,
+                                                                         y_feature=y_feature)
 
         model = LinearRegression()
         model.fit(X, y)
@@ -509,16 +535,20 @@ def run_regression_model(dataframes: List[pd.DataFrame], y_feature: str = 'heart
     to_write = f'Linear regression (50 runs) mean R-squared on train set = {r2_train} (SD = {r2_train_sd}). ' \
                f'Mean R-squared on test set = {r2_test} (SD = {r2_test_sd}). ' \
                f'Best = {round(best_model_score, 2)}.'
-    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.txt',
+    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
               'w') as wf:
         wf.write(to_write)
     print(to_write, '\n')
 
-    pickle.dump(best_model, open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p',
-                                 'wb'))
+    pickle.dump(best_model,
+                open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p',
+                     'wb'))
 
 
-def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs, y_feature: str = 'heartrate') -> None:
+def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs,
+                                         feature_explosion: bool, feature_reduction: bool,
+                                         poly_degree: int,
+                                         y_feature: str = 'heartrate') -> None:
     np.random.seed(SEED)
 
     ID_dict = {ID: dict() for ID in IDs}
@@ -534,7 +564,11 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs, y_
 
         # Do multiple independent runs in order to get a good average performance metric
         for attempt in range(50):
-            (X, X_test), (y, y_test), column_names = prepare_data_continuous(df, y_feature)
+            (X, X_test), (y, y_test), column_names = prepare_data_continuous(df,
+                                                                             feature_explosion=feature_explosion,
+                                                                             feature_reduction=feature_reduction,
+                                                                             poly_degree=poly_degree,
+                                                                             y_feature=y_feature)
 
             model = LinearRegression()
             model.fit(X, y)
@@ -569,26 +603,27 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs, y_
         ID_dict[ID]['R2 test mean'] = r2_test
         ID_dict[ID]['R2 test sd'] = r2_test_sd
 
-    regr_stats = compute_regression_stats(ID_dict)
+    regr_stats = compute_regression_stats(poly_degree, feature_explosion, feature_reduction, ID_dict)
     write_text += regr_stats
 
     with open(
-            ROOT_DIR / 'results' / f'linear_estimator_performance_per_participant_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.txt',
+            ROOT_DIR / 'results' / f'linear_estimator_performance_per_participant_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
             'w') as wf:
         wf.write(write_text)
 
     pickle.dump(ID_dict,
                 open(
-                    ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p',
-                    'wb'
-                )
+                    ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p',
+                    'wb')
                 )
 
 
-def compute_regression_stats(ID_dict: Dict[str, Dict[str, Any]] = None) -> str:
+def compute_regression_stats(poly_degree: int,
+                             feature_explosion: bool, feature_reduction: bool,
+                             ID_dict: Dict[str, Dict[str, Any]] = None) -> str:
     if ID_dict is None:
         ID_dict = pickle.load(open(
-            ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLYDEG_{REGRESSION_POLY_DEG}_{EXP_RED_STR}.p',
+            ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p',
             'wb'))
 
     means_train = []

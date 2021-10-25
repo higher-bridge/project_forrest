@@ -1,0 +1,4 @@
+
+Logistic Regression: Training mean score = 0.671 (SD = 0.012). Testing mean score  = 0.62 (SD = 0.042).
+Random Forest: Training mean score = 1.0 (SD = 0.0). Testing mean score  = 0.723 (SD = 0.048).
+KNN: Training mean score = 0.827 (SD = 0.014). Testing mean score  = 0.668 (SD = 0.048).
