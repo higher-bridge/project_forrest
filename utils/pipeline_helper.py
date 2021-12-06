@@ -164,19 +164,20 @@ def flatten_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_data_stats(df: pd.DataFrame) -> None:
-    len1 = len(df)
+    len_before = len(df)
 
     df = df.dropna()
-    len2 = (len(df))
+    len_after = (len(df))
 
     df = df.loc[df['label_hr'] != 'normal']
 
     len_low = len(df.loc[df['label_hr'] == 'low'])
-    perc_low = round((len_low / len2) * 100, 2)
-    len_high = len(df.loc[df['label_hr'] == 'high'])
-    perc_high = round((len_high / len2) * 100, 2)
+    perc_low = round((len_low / len_after) * 100, 2)
 
-    print(f'Total: {len1}. {len1 - len2} NaNs dropped.',
+    len_high = len(df.loc[df['label_hr'] == 'high'])
+    perc_high = round((len_high / len_after) * 100, 2)
+
+    print(f'Total: {len_before}. {len_before - len_after} NaNs dropped.',
           f'{len_low} low ({perc_low}%), {len_high} high ({perc_high}%).')
 
 
@@ -220,7 +221,8 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
 
 
 def remove_outliers(x: np.array, y: List[Any]) -> Tuple[np.array, np.array]:
-    num_rows = x.shape[0]
+    # num_rows = x.shape[0]
+
     for i in range(x.shape[1]):
         # Select column
         x_ = x[:, i]
@@ -268,11 +270,14 @@ def prepare_data(df: pd.DataFrame,
                                                                              test_size=TEST_SIZE,
                                                                              stratify=y)
 
+    # Reduce dimensionality (however, we should only do this if feature_explosion is also True, hence the & operator)
     if feature_explosion and feature_reduction:
         X_train = pd.DataFrame(X_train, columns=column_names)
         X_test = pd.DataFrame(X_test, columns=column_names)
         X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
 
+    # Map a StandardScaler based on train data and scale the test data using that mapping (similar to if this was
+    # actually new/unseen data)
     s = StandardScaler()
     X_train_scaled = s.fit_transform(X_train)
     X_test_scaled = s.transform(X_test)
@@ -309,6 +314,7 @@ def prepare_data_continuous(df: pd.DataFrame,
     X_train, X_test = X[train_ind], X[test_ind]
     y_train, y_test = y[train_ind], y[test_ind]
 
+    # Reduce dimensionality (however, we should only do this if feature_explosion is also True, hence the & operator)
     if feature_explosion and feature_reduction:
         X_train = pd.DataFrame(X_train, columns=column_names)
         X_test = pd.DataFrame(X_test, columns=column_names)
@@ -318,10 +324,6 @@ def prepare_data_continuous(df: pd.DataFrame,
         pf = PolynomialFeatures(degree=poly_degree, include_bias=False)
         X_train = pf.fit_transform(X_train)
         X_test = pf.transform(X_test)
-    # else:
-    #     s = StandardScaler()
-    #     X_train = s.fit_transform(X_train)
-    #     X_test = s.transform(X_test)
 
     return (X_train, X_test), (y_train, y_test), column_names
 
@@ -336,7 +338,8 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int,
                                                           feature_explosion=feature_explosion,
                                                           feature_reduction=feature_reduction)
 
-    # Run a grid search with the specified hyperparameters
+    # Run a cross-validated randomized search with the specified hyperparameter distributions and number of samples
+    # per CV iteration. Use AUC as scoring function
     start = time.time()
     param_search = RandomizedSearchCV(RandomForestClassifier(),
                                       param_distributions=HYPERPARAMS,
@@ -364,6 +367,7 @@ def run_model_search(dataframes: List[pd.DataFrame],
     df = pd.concat(dataframes)
     get_data_stats(df)
 
+    # Keep track of results throughout the iterations
     best_estimators = []
     test_scores = []
     cv_scores = []
@@ -371,22 +375,23 @@ def run_model_search(dataframes: List[pd.DataFrame],
     cv_results = pd.DataFrame()
     gini_coefficients = pd.DataFrame()
 
+    # Run the model search a certain amount of times to correct for sampling biases
     for i in range(SEARCH_ITERATIONS):
-        grid_search, test_score, to_write, column_names = run_model_search_iteration(df, i,
-                                                                                     feature_explosion=feature_explosion,
-                                                                                     feature_reduction=feature_reduction,
-                                                                                     )
+        model_search, test_score, to_write, column_names = run_model_search_iteration(df, i,
+                                                                                      feature_explosion=feature_explosion,
+                                                                                      feature_reduction=feature_reduction,
+                                                                                      )
 
-        best_estimators.append(grid_search.best_estimator_)
+        best_estimators.append(model_search.best_estimator_)
         test_scores.append(test_score)
-        cv_scores.append(grid_search.best_score_)
+        cv_scores.append(model_search.best_score_)
         text_results += to_write
 
-        cv_results_iteration = pd.DataFrame(grid_search.cv_results_)
+        cv_results_iteration = pd.DataFrame(model_search.cv_results_)
         cv_results_iteration['Iteration'] = [i] * len(cv_results_iteration)
         cv_results = cv_results.append(cv_results_iteration)
 
-        gini_coefficients_iteration = pd.DataFrame(grid_search.best_estimator_.feature_importances_,
+        gini_coefficients_iteration = pd.DataFrame(model_search.best_estimator_.feature_importances_,
                                                    index=column_names).T
         gini_coefficients = gini_coefficients.append(gini_coefficients_iteration)
 
@@ -397,7 +402,8 @@ def run_model_search(dataframes: List[pd.DataFrame],
           f'{round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)})')
 
     # Write performance in text
-    with open(ROOT_DIR / 'results' / f'model_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt', 'w') as wf:
+    with open(ROOT_DIR / 'results' / f'model_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
+              'w') as wf:
         wf.write(text_results)
 
     # Save cross-validation results
@@ -405,10 +411,13 @@ def run_model_search(dataframes: List[pd.DataFrame],
     cv_results.to_csv(ROOT_DIR / 'results' / f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save the gini coefficients
-    gini_coefficients.to_csv(ROOT_DIR / 'results' / f'best_estimator_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
+    gini_coefficients.to_csv(
+        ROOT_DIR / 'results' / f'best_estimator_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save best estimators to pickle
-    pickle.dump(best_estimators, open(ROOT_DIR / 'results' / f'best_estimator_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p', 'wb'))
+    pickle.dump(best_estimators,
+                open(ROOT_DIR / 'results' / f'best_estimator_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p',
+                     'wb'))
 
 
 def run_model_preselection(dataframes: List[pd.DataFrame],
@@ -417,6 +426,8 @@ def run_model_preselection(dataframes: List[pd.DataFrame],
     df = pd.concat(dataframes)
     get_data_stats(df)
 
+    # Specify the names of the models (make sure these names match the models in the
+    # 'models' list specified 16 lines below)
     model_names = ['Logistic Regression', 'Random Forest', 'KNN']
 
     scores_train = {key: [] for key in model_names}
@@ -431,6 +442,7 @@ def run_model_preselection(dataframes: List[pd.DataFrame],
         if attempt == 0:
             print(f'Train set: {len(X)} values. Test set: {len(X_test)} values.')
 
+        # Specify the models to use (make sure these match the names in the 'model_names' list above)
         models = [LogisticRegression(),
                   RandomForestClassifier(),
                   KNeighborsClassifier()]
@@ -448,6 +460,7 @@ def run_model_preselection(dataframes: List[pd.DataFrame],
             auc_ = roc_auc_score(y_test, y_pred_prob)
             scores[model_name].append(auc_)
 
+    # Write results as text
     to_write = str()
     for model_name in model_names:
         train_scores = scores_train[model_name]
@@ -457,12 +470,14 @@ def run_model_preselection(dataframes: List[pd.DataFrame],
         to_write += f'Training mean score = {round(np.mean(train_scores), 3)} (SD = {round(np.std(train_scores), 3)}). '
         to_write += f'Testing mean score  = {round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)}).'
 
-    with open(ROOT_DIR / 'results' / f'model_preliminary_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt', 'w') as wf:
+    with open(
+            ROOT_DIR / 'results' / f'model_preliminary_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
+            'w') as wf:
         wf.write(to_write)
     print(to_write, '\n')
 
 
-def get_scores_and_parameters(feature_explosion: bool, feature_reduction: bool,) -> None:
+def get_scores_and_parameters(feature_explosion: bool, feature_reduction: bool, ) -> None:
     path = ROOT_DIR / 'results' / f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv'
     df = pd.read_csv(path)
 
@@ -532,17 +547,21 @@ def run_regression_model(dataframes: List[pd.DataFrame],
     r2_train_sd = round(np.std(train_r2), 2)
     r2_test_sd = round(np.std(test_r2), 2)
 
+    # Write results as text
     to_write = f'Linear regression (50 runs) mean R-squared on train set = {r2_train} (SD = {r2_train_sd}). ' \
                f'Mean R-squared on test set = {r2_test} (SD = {r2_test_sd}). ' \
                f'Best = {round(best_model_score, 2)}.'
-    with open(ROOT_DIR / 'results' / f'linear_estimator_performance_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
-              'w') as wf:
+    with open(
+            ROOT_DIR / 'results' / f'linear_estimator_performance_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
+            'w') as wf:
         wf.write(to_write)
     print(to_write, '\n')
 
+    # Save model as pickle
     pickle.dump(best_model,
-                open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p',
-                     'wb'))
+                open(
+                    ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p',
+                    'wb'))
 
 
 def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs,
@@ -551,6 +570,7 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs,
                                          y_feature: str = 'heartrate') -> None:
     np.random.seed(SEED)
 
+    # Create a dict with an empty dict for each ID inside it
     ID_dict = {ID: dict() for ID in IDs}
     write_text = ''
 
@@ -559,6 +579,7 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs,
         test_r2 = []
         coefs = []
 
+        # Keep track of a best-performing model (we set the baseline very low, since some models score negatively)
         best_model = [None, None, None, None, None]
         best_model_score = -1e10
 
@@ -621,6 +642,7 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs,
 def compute_regression_stats(poly_degree: int,
                              feature_explosion: bool, feature_reduction: bool,
                              ID_dict: Dict[str, Dict[str, Any]] = None) -> str:
+    # We can either pass an ID_dict into this function or load it from a pickle
     if ID_dict is None:
         ID_dict = pickle.load(open(
             ROOT_DIR / 'results' / f'linear_estimator_per_participant_POLYDEG_{poly_degree}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p',

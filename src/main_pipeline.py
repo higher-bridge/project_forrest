@@ -35,16 +35,20 @@ def main(group: bool = False,
          preselection: bool = True,
          search: bool = True,
          regression: bool = True,
+         regression_plot: bool = True,
+         regression_per_participant: bool = True,
          feature_explosion: bool = None,
          feature_reduction: bool = None,
          poly_degree: int = None) -> None:
 
+    # Check whether these parameters are specified, otherwise grab them from constants.py
     if feature_explosion is None or feature_reduction is None:
         feature_explosion, feature_reduction = USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION
     if poly_degree is None:
         poly_degree = REGRESSION_POLY_DEG
     if poly_degree > 2:
-        UserWarning('Are you sure you want to use a polynomial regression with degree >2?')
+        UserWarning('Are you sure you want to use a polynomial regression with degree >2? '
+                    'This will increase the number of variables and computational time.')
 
     dataframes, IDs = load_merged_files('eyetracking', suffix='*-processed.tsv')
 
@@ -96,12 +100,16 @@ def main(group: bool = False,
                              feature_reduction=feature_reduction,
                              poly_degree=poly_degree,
                              y_feature='heartrate')
-        plot_linear_predictions_scatter(feature_explosion=feature_explosion, feature_reduction=feature_reduction, poly_deg=poly_degree)
-        run_regression_model_per_participant(dataframes_exploded, IDs,
-                                             feature_explosion=feature_explosion,
-                                             feature_reduction=feature_reduction,
-                                             poly_degree=poly_degree,
-                                             y_feature='heartrate')
+
+        if regression_plot:
+            plot_linear_predictions_scatter(feature_explosion=feature_explosion, feature_reduction=feature_reduction, poly_deg=poly_degree)
+
+        if regression_per_participant:
+            run_regression_model_per_participant(dataframes_exploded, IDs,
+                                                 feature_explosion=feature_explosion,
+                                                 feature_reduction=feature_reduction,
+                                                 poly_degree=poly_degree,
+                                                 y_feature='heartrate')
 
 
 main()
