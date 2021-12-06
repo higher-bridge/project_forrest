@@ -34,7 +34,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import LabelBinarizer, StandardScaler, PolynomialFeatures
 from sklearn.utils import shuffle
 
-from constants import (DIMENSIONS_PER_FEATURE, HYPERPARAMS, IND_VARS,
+from constants import (DEP_VAR_BINARY, DIMENSIONS_PER_FEATURE, HYPERPARAMS, IND_VARS,
                        PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
                        N_JOBS, HYPERPARAMETER_SAMPLES,
                        SEED, REGRESSION_TEST_SIZE)
@@ -117,8 +117,8 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
         df_agg['count'] = df_counts['duration']['count']
 
         df_agg['label_hr'] = df_counts['label_hr']['mean']
-        df_agg['diff_hr'] = df_counts['diff_hr']['mean']
-        df_agg['sd_hr'] = df_counts['sd_hr']['mean']
+        df_agg['label_hr_median'] = df_counts['label_hr_median']['mean']
+        df_agg['label_hr_log'] = df_counts['label_hr_log']['mean']
         df_agg['ID'] = df_counts['ID']['mean']
         df_agg['heartrate'] = df_counts['heartrate']['mean']
 
@@ -126,7 +126,7 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
         if flatten:
             df_agg = flatten_dataframe(df_agg)
 
-        df_agg['label_hr'] = df_agg['label_hr'].apply(rename_labels)
+        df_agg[DEP_VAR_BINARY] = df_agg[DEP_VAR_BINARY].apply(rename_labels)
         df_agg['ID'] = list(repeat(ID, len(df_agg)))
         # df_agg['scene_diff'] = scene_diffs
 
@@ -141,7 +141,7 @@ def flatten_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     cols_to_unify = []
     replacement_cols = dict()
     for col in flattened_df.columns:
-        if col[0] in ['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr']:
+        if col[0] in ['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log']:
             cols_to_unify.append(col)
 
             if col[0] not in list(replacement_cols.keys()):
@@ -169,12 +169,12 @@ def get_data_stats(df: pd.DataFrame) -> None:
     df = df.dropna()
     len_after = (len(df))
 
-    df = df.loc[df['label_hr'] != 'normal']
+    df = df.loc[df[DEP_VAR_BINARY] != 'normal']
 
-    len_low = len(df.loc[df['label_hr'] == 'low'])
+    len_low = len(df.loc[df[DEP_VAR_BINARY] == 'low'])
     perc_low = round((len_low / len_after) * 100, 2)
 
-    len_high = len(df.loc[df['label_hr'] == 'high'])
+    len_high = len(df.loc[df[DEP_VAR_BINARY] == 'high'])
     perc_high = round((len_high / len_after) * 100, 2)
 
     print(f'Total: {len_before}. {len_before - len_after} NaNs dropped.',
@@ -255,10 +255,10 @@ def prepare_data(df: pd.DataFrame,
                                                                             List[str]]:
     # Drop NANs and remove data where label is not high or low
     df = df.dropna()
-    df = df.loc[df['label_hr'] != 'normal']
+    df = df.loc[df[DEP_VAR_BINARY] != 'normal']
 
-    y_ = list(df['label_hr'])
-    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr', 'chunk'], axis=1)
+    y_ = list(df[DEP_VAR_BINARY])
+    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log', 'chunk'], axis=1)
     column_names = X_base.columns
 
     X_base, y_ = remove_outliers(np.array(X_base), y_)
@@ -297,7 +297,7 @@ def prepare_data_continuous(df: pd.DataFrame,
     # Get heartrates
     y = list(df[y_feature])
 
-    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'diff_hr', 'sd_hr', 'chunk'], axis=1)
+    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log', 'chunk'], axis=1)
     column_names = list(X_base.columns)
 
     X = np.array(X_base)

@@ -117,38 +117,46 @@ def get_bpm_dict(df_hr: List[pd.DataFrame], ID_hr: List[str], verbose: bool = Tr
     return bpm_dict
 
 
-def get_heartrate_metrics(df: pd.DataFrame, ID: str) -> pd.DataFrame:
-    df_ = df.loc[df['label'] == 'FIXA']
+def get_hr_labels(df: pd.DataFrame, center: str = 'mean') -> List[int]:
+    if center == 'log':
+        # Compute the logarithm of the heart rate values (deep copy so we don't change values in-place)
+        df_log = df.copy(deep=True)
+        df_log['heartrate'] = np.log(df_log['heartrate'])
+        df_ = df_log.loc[df_log['label'] == 'FIXA']
+    else:
+        df_ = df.loc[df['label'] == 'FIXA']
+
+    # Heart rate value is already the same value throughout the chunk.
+    # Here we group it so that we can get one row per chunk, no actual values are changed
     df_avg = df_.groupby(['chunk']).agg('mean').reset_index()
 
-    mean_overall = np.mean(df_avg['heartrate'])
-    sd_overall = np.std(df_avg['heartrate'])
-    se_overall = sd_overall / np.sqrt(len(df_avg))
+    if center == 'mean' or center == 'log':
+        distribution_center = np.nanmean(df_avg['heartrate'])
+    elif center == 'median':
+        distribution_center = np.nanmedian(df_avg['heartrate'])
+    else:
+        raise UserWarning('Specify either mean, median or log')
 
-    print(f'{ID}: Mean overall = {round(mean_overall, 2)} (SD = {round(sd_overall, 2)}, SE = {round(se_overall, 2)})')
+    sd_overall = np.std(df_avg['heartrate'])
 
     hr_label = []
-    hr_diff = []
-    hr_sd = []
 
     for hr in list(df['heartrate']):
         # Compute if heartrate is higher or lower than the overall mean +/- a number of standard deviations
-        if hr > mean_overall + (sd_overall * SD_DEV_THRESH):
+        if hr > distribution_center + (sd_overall * SD_DEV_THRESH):
             hr_label.append(1)  # High
-        elif hr < mean_overall - (sd_overall * SD_DEV_THRESH):
+        elif hr < distribution_center - (sd_overall * SD_DEV_THRESH):
             hr_label.append(-1)  # Low
         else:
             hr_label.append(0)  # In between / normal
 
-        # Compute relative difference between current heart rate and overall mean
-        hr_diff.append(hr / mean_overall)
+    return hr_label
 
-        # Compute how many SDs current heart rate is removed from mean
-        hr_sd.append((hr - mean_overall) / sd_overall)
 
-    df['label_hr'] = hr_label
-    df['diff_hr'] = hr_diff
-    df['sd_hr'] = hr_sd
+def get_heartrate_metrics(df: pd.DataFrame, ID: str) -> pd.DataFrame:
+    df['label_hr'] = get_hr_labels(df, 'mean')
+    df['label_hr_median'] = get_hr_labels(df, 'median')
+    df['label_hr_log'] = get_hr_labels(df, 'log')
 
     return df
 

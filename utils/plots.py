@@ -26,7 +26,7 @@ import seaborn as sns
 from matplotlib import rcParams
 from scipy.stats import ttest_1samp
 
-from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH
+from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH, DEP_VAR_BINARY
 from utils.pipeline_helper import rename_features
 
 
@@ -46,8 +46,8 @@ def plot_feature_hist(df: pd.DataFrame) -> None:
     for row, feature in enumerate(features):
         for col, move_type in enumerate(move_types):
             df_move_type = df.loc[df['label'] == move_type]
-            df_low = df_move_type.loc[df_move_type['label_hr'] == 'low']
-            df_high = df_move_type.loc[df_move_type['label_hr'] == 'high']
+            df_low = df_move_type.loc[df_move_type[DEP_VAR_BINARY] == 'low']
+            df_high = df_move_type.loc[df_move_type[DEP_VAR_BINARY] == 'high']
 
             sns.kdeplot(x=feature, data=df_high, ax=axes[i],
                         label='High', color=palette[1],
@@ -100,8 +100,8 @@ def plot_heartrate_hist(df: pd.DataFrame) -> None:
     for i, ID in enumerate(list(df['ID'].unique())):
         df_ = df.loc[df['ID'] == ID]
 
-        df_low = df_.loc[df_['label_hr'] == 'low']
-        df_high = df_.loc[df_['label_hr'] == 'high']
+        df_low = df_.loc[df_[DEP_VAR_BINARY] == 'low']
+        df_high = df_.loc[df_[DEP_VAR_BINARY] == 'high']
 
         sns.histplot(x='heartrate', data=df_low, ax=axes[i],
                      label='Low', color=palette[0],

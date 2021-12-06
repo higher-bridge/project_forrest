@@ -26,7 +26,7 @@ from utils.pipeline_helper import (get_scores_and_parameters,
 from utils.plots import (plot_feature_hist, plot_heartrate_hist,
                          plot_heartrate_over_time, plot_gini_coefficients,
                          plot_linear_predictions, plot_linear_predictions_scatter)
-from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, REGRESSION_POLY_DEG
+from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, REGRESSION_POLY_DEG, DEP_VAR_BINARY
 
 
 def main(group: bool = False,
@@ -37,6 +37,7 @@ def main(group: bool = False,
          regression: bool = True,
          regression_plot: bool = True,
          regression_per_participant: bool = True,
+         binary_label: str = None,
          feature_explosion: bool = None,
          feature_reduction: bool = None,
          poly_degree: int = None) -> None:
@@ -46,6 +47,8 @@ def main(group: bool = False,
         feature_explosion, feature_reduction = USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION
     if poly_degree is None:
         poly_degree = REGRESSION_POLY_DEG
+    if binary_label is None:
+        binary_label = DEP_VAR_BINARY
     if poly_degree > 2:
         UserWarning('Are you sure you want to use a polynomial regression with degree >2? '
                     'This will increase the number of variables and computational time.')
@@ -75,7 +78,7 @@ def main(group: bool = False,
         dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
 
     # Model
-    print(f'Running models with EXPLOSION={feature_explosion}, REDUCTION={feature_reduction}.')
+    print(f'Running models with EXPLOSION={feature_explosion}, REDUCTION={feature_reduction}, binary label={binary_label}.')
     if preselection:
         run_model_preselection(dataframes_exploded,
                                feature_explosion=feature_explosion,

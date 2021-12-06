@@ -35,6 +35,7 @@ SD_DEV_THRESH = .75  # Set threshold for high/low heartrate label as N standard 
 
 PURSUIT_AS_FIX = False  # Indicate whether smooth pursuits should be counted as regular fixations
 IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # , 'med_vel'
+DEP_VAR_BINARY = 'label_hr'
 
 HYPERPARAMS = dict()
 HYPERPARAMS['n_estimators'] = list(np.arange(10, 160, step=1))
@@ -47,7 +48,7 @@ REGRESSION_TEST_SIZE = .20
 
 # Model search parameters
 HYPERPARAMETER_SAMPLES = 10  # Set how often to sample the hyperparameter distributions in each iteration
-SEARCH_ITERATIONS = 3  # Set how often to re-run the grid search
+SEARCH_ITERATIONS = 5  # Set how often to re-run the grid search
 
 # Mind that the following features can be overridden if specified as a main() argument in main_pipeline.py
 USE_FEATURE_EXPLOSION = False
