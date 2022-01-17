@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
 import time
+import subprocess
 from typing import Any, Dict, List
 
 import heartpy as hp
@@ -30,27 +31,35 @@ from constants import (CHUNK_SIZE, HZ, HZ_HEART, N_JOBS, PX2DEG,
                        SD_DEV_THRESH)
 
 
-def run_remodnav(files_et: List[Path], verbose: bool = True) -> List[Any]:
-    if N_JOBS == 0:  # Run single core
+def run_remodnav(files_et: List[Path], verbose: bool = True) -> None:
+    # REMoDNaV returns nothing but writes immediately to file
+    if N_JOBS is None or N_JOBS == 1:  # Run single core
         results = []
 
         for f in files_et:
-            fixations = remodnav.main([None, str(f), str(f).replace('-merged.tsv', '-extracted.tsv'),
-                                       str(PX2DEG), str(HZ)])
+            fixations = remodnav.main([None,
+                                       str(f),
+                                       str(f).replace('.tsv', '-extracted.tsv'),
+                                       str(PX2DEG),
+                                       str(HZ),
+                                       '--min-fixation-duration', '0.06'])
             results.append(fixations)
 
     else:  # Run with parallelism
         arg_list = []
         for f in files_et:
-            arg1 = str(f)
-            arg2 = str(f).replace('-merged.tsv', '-extracted.tsv')
+            in_file = str(f)
+            out_file = str(f).replace('.tsv', '-extracted.tsv')
 
-            arg_list.append([None, arg1, arg2, str(PX2DEG), str(HZ)])
+            arg_list.append([None,
+                             in_file,
+                             out_file,
+                             str(PX2DEG),
+                             str(HZ),
+                             '--min-fixation-duration', '0.06'])
 
         results = Parallel(n_jobs=N_JOBS, backend='loky', verbose=verbose)(
             delayed(remodnav.main)(args) for args in arg_list)
-
-    return results
 
 
 def detect_heartrate(signal: List[Any]) -> List[float]:

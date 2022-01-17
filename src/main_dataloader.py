@@ -19,7 +19,7 @@ import numpy as np
 from utils.detection import (add_bpm_to_eyetracking, get_bpm_dict,
                              run_remodnav, split_into_chunks)
 from utils.file_management import (add_ID_column, get_list_of_files,
-                                   load_and_concatenate_files,
+                                   concatenate_files,
                                    load_merged_files, write_to_tsv)
 from constants import SEED
 
@@ -27,24 +27,23 @@ from constants import SEED
 def main() -> None:
     np.random.seed(SEED)
 
-    # If not done before, concat files so each ID has one associated file instead of 8
-    load_and_concatenate_files('eyetracking', '*physio.tsv')
-    load_and_concatenate_files('heartrate', '*physio.tsv')
-
-    # Load the merged files
-    df_hr, ID_hr = load_merged_files('heartrate')
-
     # Retrieve file names and run fixation detection with REMODNAV (takes several minutes. Number of CPU cores to use
-    # can be specified in constants.py).
-    # Use if fixation extraction has not been done before and/or if *-extracted.tsv files are not available
-    files_et = get_list_of_files('eyetracking', '*-merged.tsv')
-    results = run_remodnav(files_et)
+    # can be specified in constants.py). Use if fixation extraction has not been done before and/or if *-extracted.tsv
+    # files are not available
+    files_et = get_list_of_files('eyetracking', '*physio.tsv')
+    run_remodnav(files_et)
 
-    # Use if extraction already done before
-    results, ID_et = load_merged_files('eyetracking', '*-extracted.tsv')
+    concatenate_files('eyetracking', '*-extracted.tsv')
+
+    # Load oculomotor features
+    results, ID_et = load_merged_files('eyetracking', '*-merged.tsv')
 
     # Add chunk indices to ET dataframes
     df_et = [split_into_chunks(df, 'eyetracking') for df in results]
+
+    # Merge and load heart rate files
+    concatenate_files('heartrate', '*physio.tsv')
+    df_hr, ID_hr = load_merged_files('heartrate')
 
     # Get bpm per chunk and append as column to each ET file
     bpm_dict = get_bpm_dict(df_hr, ID_hr, verbose=False)
