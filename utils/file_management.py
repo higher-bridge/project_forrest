@@ -52,12 +52,13 @@ def get_filenames_dict(measurement_type: str, filetype_arg: str = None) -> Dict:
     return file_dict
 
 
-def load_and_concatenate_files(measurement_type: str, filetype_arg: str = None) -> None:
+def concatenate_files(measurement_type: str, filetype_arg: str = None) -> None:
     file_dict = get_filenames_dict(measurement_type, filetype_arg)
 
     df_dict = dict()
+    header = True
 
-    print(f'Merging all files per ID with type "{measurement_type}"')
+    print(f'Concatenating all files per ID with type "{measurement_type}"')
 
     for file_key in list(file_dict.keys()):
         if measurement_type == 'normdiff':  # normdiff.tsv has headers
@@ -66,20 +67,29 @@ def load_and_concatenate_files(measurement_type: str, filetype_arg: str = None) 
             for df_prev, df in zip(dfs[:-1], dfs[1:]):
                 df.iloc[:, 0] += df_prev.iloc[-1, 0]
 
+        elif measurement_type == 'eyetracking':
+            dfs = []
+            prev_onset = 0
+
+            for f in file_dict[file_key]:
+                df = pd.read_csv(f, sep='\t', encoding='utf-8')
+
+                # Increment the event onsets based on last events of previous df
+                df['onset'] = round(df['onset'] + prev_onset, 3)
+                prev_onset = list(df['onset'])[-1] + list(df['duration'])[-1]
+
+                dfs.append(df)
+
         else:
             dfs = [pd.read_csv(f, sep='\t', header=None, encoding='utf-8') for f in file_dict[file_key]]
+            header = False
 
         df = pd.concat(dfs)
 
         df_dict[file_key] = df
 
-        # new_path = ROOT_DIR / 'data' / measurement_type / f'{file_key}-{measurement_type}-merged.csv'
-        # df.to_csv(new_path,
-        #           header=False, index=False)
-
         new_path = ROOT_DIR / 'data' / measurement_type / f'{file_key}-{measurement_type}-merged.tsv'
-        df.to_csv(new_path,
-                  header=False, index=False, sep='\t')
+        df.to_csv(new_path, header=header, index=False, sep='\t')
 
 
 def load_merged_files(measurement_type: str, suffix: str = '*-merged.tsv') -> Tuple[List[pd.DataFrame], List[str]]:
@@ -92,7 +102,7 @@ def load_merged_files(measurement_type: str, suffix: str = '*-merged.tsv') -> Tu
 
     print(f'Loading {len(files)} files of type {measurement_type}: {IDs}')
 
-    if suffix == '*-merged.tsv':
+    if measurement_type == 'heartrate':
         dfs = [pd.read_csv(f, sep='\t', header=None) for f in files]
     else:
         dfs = [pd.read_csv(f, sep='\t') for f in files]
