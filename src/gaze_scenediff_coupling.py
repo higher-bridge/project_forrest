@@ -22,9 +22,9 @@ import numpy as np
 import pandas as pd
 import pingouin as pg
 
+from constants import SEED
 from utils.file_management import load_merged_files
 from utils.scenediff_helper import get_scenediffs
-from constants import SEED
 
 
 def correlate(x: List[float], y: List[float]) -> None:

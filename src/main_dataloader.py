@@ -16,25 +16,23 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 import numpy as np
-from utils.detection import (add_bpm_to_eyetracking, get_bpm_dict,
-                             run_remodnav, run_i2mc, run_hessels_classifier, split_into_chunks)
-from utils.file_management import (add_ID_column, get_list_of_files,
-                                   concatenate_files,
-                                   load_merged_files, write_to_tsv)
+
 from constants import SEED
+from utils.detection import (add_bpm_to_eyetracking, get_bpm_dict,
+                             run_hessels_classifier, split_into_chunks)
+from utils.file_management import (add_ID_column, concatenate_files,
+                                   get_list_of_files, load_merged_files,
+                                   write_to_tsv)
 
 
 def main() -> None:
     np.random.seed(SEED)
 
-    # Retrieve file names and run fixation detection with REMODNAV (takes several minutes. Number of CPU cores to use
+    # Retrieve file names and run fixation detection with (takes a while. Number of CPU cores to use
     # can be specified in constants.py). Use if fixation extraction has not been done before and/or if *-extracted.tsv
     # files are not available
     files_et = get_list_of_files('eyetracking', '*physio.tsv')
-    # run_remodnav(files_et)
-    # run_i2mc(files_et)
     run_hessels_classifier(files_et)
-
     concatenate_files('eyetracking', '*-extracted.tsv')
 
     # Load oculomotor features

@@ -16,8 +16,9 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-import numpy as np
 from pathlib import Path
+
+import numpy as np
 from matplotlib import rcParams
 
 SEED = 42                         # Set a seed for reproducibility

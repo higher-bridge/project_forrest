@@ -1,4 +1,4 @@
-name: projforrest
+name: forrest
 channels:
   - defaults
 dependencies:
@@ -60,5 +60,4 @@ dependencies:
   - zstd=1.4.9=h322a384_0
   - pip:
     - heartpy==1.2.7
-    - remodnav==1.0
-prefix: /Users/alexos/opt/anaconda3/envs/projforrest
+prefix: /Users/4137477/opt/anaconda3/envs/forrest

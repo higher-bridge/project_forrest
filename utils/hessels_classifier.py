@@ -18,16 +18,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Python implementation of slow/fast phase classifier as in Roy S. Hessels, Andrea J. van Doorn, Jeroen S. Benjamins,
 Gijs A. Holleman & Ignace T. C. Hooge (2020). Task-related gaze control in human crowd navigation.
 Attention, Perception, & Psychophysics 82, pp. 2482–2501. doi: 10.3758/s13414-019-01952-9
+
 Original Matlab implementation can be found at:
 https://github.com/dcnieho/GlassesViewer/tree/master/user_functions/HesselsEtAl2020
 """
 
+from pathlib import Path
+from typing import List, Tuple
+
 import numpy as np
 import pandas as pd
-from typing import List, Tuple
-from pathlib import Path
 
-from constants import PX2DEG, HESSELS_THR, HESSELS_LAMBDA, HESSELS_MAX_ITER, HESSELS_WINDOW_SIZE, HESSELS_MINFIX
+from constants import (HESSELS_LAMBDA, HESSELS_MAX_ITER, HESSELS_MINFIX,
+                       HESSELS_THR, HESSELS_WINDOW_SIZE, PX2DEG)
+
 
 ### STATISTICS FUNCTIONS ###
 def get_amplitudes(start_x: np.ndarray, start_y: np.ndarray, end_x: np.ndarray, end_y: np.ndarray) -> np.ndarray:
@@ -150,10 +154,10 @@ def threshold(vel: np.ndarray) -> np.array:
     return np.array([thr2] * len(vel))
 
 
-def load_data(f: Path) -> pd.DataFrame:
-    df = pd.read_csv(f, delimiter='\t', header=None)
+def load_data(f: Path, delimiter: str, header) -> pd.DataFrame:
+    df = pd.read_csv(f, delimiter=delimiter, header=header)
 
-    # Add colnames, drop last two
+    # Add colnames, drop last two (hardcoded for the studyforrest dataset, needs changing with other datasets)
     df.columns = ['x', 'y', 'pupilsize', 'frameno']
     df = df.drop(['pupilsize', 'frameno'], axis=1)
 
@@ -163,15 +167,17 @@ def load_data(f: Path) -> pd.DataFrame:
     return df
 
 
-def classify_hessels2018(f: Path, verbose: bool = False) -> pd.DataFrame:
+def classify_hessels2018(f: Path, delimiter: str = '\t', header = None, verbose: bool = False) -> pd.DataFrame:
     """
     Implementation of Hessels et al., 2020 (see docstring at top of file)
     :param f: A pathlib Path to file (in this case .tsv)
+    :param header: Whether the file has column headers (e.g. None or 0), see pandas documentation
+    :param delimiter: The delimiter in the file. Use None for normal csv
     :param verbose: A bool indicating whether to print progress
     :return: A pd.DataFrame with column labels [label, onset, duration, amp, avg_vel, med_vel, peak_vel,
                                                 start_x, end_x, start_y, end_y]
     """
-    df = load_data(f)
+    df = load_data(f, delimiter, header)
     x = np.array(df['x'])
     y = np.array(df['y'])
     ts = np.array(df['time'])
@@ -224,6 +230,7 @@ def classify_hessels2018(f: Path, verbose: bool = False) -> pd.DataFrame:
 
     start_x, start_y, end_x, end_y = get_starts_ends(x, y, imarks)
 
+    # Retrieve some extra information from the data
     results = {'label':     phase_types,
                'onset':     smarks,
                'duration':  get_durations(smarks),
@@ -237,5 +244,8 @@ def classify_hessels2018(f: Path, verbose: bool = False) -> pd.DataFrame:
                'end_y':     end_y}
 
     results = pd.DataFrame(results)
+
+    if verbose:
+        print(df.head())
 
     return results
