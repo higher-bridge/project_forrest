@@ -22,11 +22,13 @@ import subprocess
 from typing import Any, Dict, List
 
 import heartpy as hp
+from I2MC import I2MC
 import numpy as np
 import pandas as pd
 import remodnav
 from joblib import Parallel, delayed
 
+from utils.hessels_classifier import classify_hessels2018
 from constants import (CHUNK_SIZE, HZ, HZ_HEART, N_JOBS, PX2DEG,
                        SD_DEV_THRESH)
 
@@ -42,7 +44,8 @@ def run_remodnav(files_et: List[Path], verbose: bool = True) -> None:
                                        str(f).replace('.tsv', '-extracted.tsv'),
                                        str(PX2DEG),
                                        str(HZ),
-                                       '--min-fixation-duration', '0.06'])
+                                       '--min-fixation-duration', '0.06',
+                                       '--pursuit-velthresh', '2.0'])
             results.append(fixations)
 
     else:  # Run with parallelism
@@ -56,10 +59,62 @@ def run_remodnav(files_et: List[Path], verbose: bool = True) -> None:
                              out_file,
                              str(PX2DEG),
                              str(HZ),
-                             '--min-fixation-duration', '0.06'])
+                             '--min-fixation-duration', '0.06',
+                             '--pursuit-velthresh', '2.0'])
 
         results = Parallel(n_jobs=N_JOBS, backend='loky', verbose=verbose)(
             delayed(remodnav.main)(args) for args in arg_list)
+
+
+def run_i2mc(files_et: List[Path]) -> None:
+    options = dict()
+    options['xres'] = 1280
+    options['yres'] = 546  # 1024 full screen
+    options['missingx'] = np.nan
+    options['missingy'] = np.nan
+    options['freq'] = 1000
+    options['disttoscreen'] = 63
+
+    # For the full screen:
+    # options['scrSz'] = (26.5, 21.2)  # 1280px / 1024px = 1.25 (5:4 ratio). 26.5 cm width -> 33.9 diag / 21.2 height
+    # Only the actual stimulus (video content), to which gaze coordinates were mapped:
+    options['scrSz'] = (26.5, 11.3)   # 1280px / 546px = 2.35 (47:20 ratio). 26.5 cm width -> 28.8 diag / 11.3 height
+
+    options['minFixDur'] = 60.0
+
+    # Loop through list of Paths
+    for f in files_et:
+        df = pd.read_csv(f, delimiter='\t', header=None)
+
+        # Add colnames, drop last two
+        df.columns = ['L_X', 'L_Y', 'pupilsize', 'frameno']
+        df = df.drop(['pupilsize', 'frameno'], axis=1)
+
+        # Data is steady 1kHz, but has no timestamps, so add (in ms)
+        df['time'] = np.arange(len(df))
+
+        # Run I2MC fixation detection
+        events, _, _ = I2MC(df, options)
+
+        # Save to df
+        events_df = pd.DataFrame(events)
+        events_df.to_csv(str(f).replace('.tsv', '-extracted.tsv'), delimiter='\t')
+
+
+def run_hessels_classifier(files_et: List[Path], verbose: bool = True) -> None:
+    if N_JOBS is None or N_JOBS == 1:  # Run single core
+        # Loop through list of Paths
+        for i, f in enumerate(files_et):
+            print(f'Classifying dataset {i} of {len(files_et)}')
+            events_df = classify_hessels2018(f, verbose=True)
+            events_df.to_csv(str(f).replace('.tsv', '-extracted.tsv'), delimiter='\t')
+
+    else:
+        results = Parallel(n_jobs=N_JOBS, backend='loky', verbose=verbose)(
+            delayed(classify_hessels2018)(f) for f in files_et)
+
+        for f, events_df in zip(files_et, results):
+            events_df.to_csv(str(f).replace('.tsv', '-extracted.tsv'), delimiter='\t')
 
 
 def detect_heartrate(signal: List[Any]) -> List[float]:
@@ -109,10 +164,6 @@ def get_bpm_dict(df_hr: List[pd.DataFrame], ID_hr: List[str], verbose: bool = Tr
     bpm_dict = {key: dict() for key in ID_hr}
 
     for df, ID in zip(df_hr, ID_hr):
-        start_id = time.time()
-        # df_ = split_into_chunks(df, 'heartrate')
-
-        # signal = list(df_.loc[:, 1])
         signal = list(df.loc[:, 1])
         bpm_values = detect_heartrate(signal)
 
@@ -120,8 +171,7 @@ def get_bpm_dict(df_hr: List[pd.DataFrame], ID_hr: List[str], verbose: bool = Tr
             bpm_dict[ID][chunk] = bpm_values[chunk]
 
         if verbose:
-            print(f'ID {ID}: {round(time.time() - start_id, 2)} seconds.',
-                  f'Mean of mean = {round(float(np.mean(bpm_values)), 2)} bpm over {len(bpm_values)} chunks.')
+            print(f'Mean of mean = {round(float(np.mean(bpm_values)), 2)} bpm over {len(bpm_values)} chunks.')
 
     return bpm_dict
 
