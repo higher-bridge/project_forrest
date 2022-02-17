@@ -16,18 +16,37 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+from pathlib import Path
+import pickle
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pickle
 import seaborn as sns
 from matplotlib import rcParams
 from scipy.stats import ttest_1samp
 
-from constants import IND_VARS, ROOT_DIR, SD_DEV_THRESH, DEP_VAR_BINARY
+from constants import DEP_VAR_BINARY, IND_VARS, ROOT_DIR, SD_DEV_THRESH
 from utils.pipeline_helper import rename_features
+
+
+def plot_phase_distributions(files_et: List[Path]) -> None:
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    files = [str(f).replace('.tsv', '-extracted.tsv') for f in files_et]
+    dfs = [pd.read_csv(f, delimiter='\t') for f in files]
+    df = pd.concat(dfs)
+    df = df.loc[df['label'] != 'none']
+
+    for feat in ['duration', 'amp', 'avg_vel', 'med_vel', 'peak_vel']:
+        plt.figure()
+        # sns.kdeplot(x=feat, data=df, hue='label',
+        #             fill=True, linewidth=2)
+        sns.histplot(x=feat, data=df, hue='label',
+                     multiple='layer', stat='count', element='step')
+        plt.show()
 
 
 def plot_feature_hist(df: pd.DataFrame) -> None:
@@ -65,7 +84,7 @@ def plot_feature_hist(df: pd.DataFrame) -> None:
 
             # Set feature label only on first column
             if i % ncols == 0:
-                axes[i].set_ylabel(rename_features(feature))
+                axes[i].set_ylabel(rename_features(feature), fontsize=9)
             else:
                 axes[i].set_ylabel('')
 
@@ -173,7 +192,7 @@ def test_if_significant_from_mean(values: pd.Series, overall_mean: np.array) -> 
         return False
 
 
-def plot_gini_coefficients(feature_explosion: bool, feature_reduction: bool,) -> None:
+def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, ) -> None:
     path = ROOT_DIR / 'results' / f'best_estimator_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv'
     df = pd.read_csv(path)
     df = df.drop(['Unnamed: 0'], axis=1)
@@ -196,6 +215,7 @@ def plot_gini_coefficients(feature_explosion: bool, feature_reduction: bool,) ->
                 capsize=.5, errwidth=1.2,
                 orient='h')
     plt.axvline(x=np.mean(df_['Gini impurity']), linestyle='--', color='red')
+    plt.xlabel(f'Coefficient (explosion={feature_explosion}, reduction={feature_reduction})')
 
     # Compute the mean impurity for each feature, so we can use it later to determine the max and plot a * besides it
     feature_means = [np.mean(df_.loc[df_['Feature'] == feat]['Gini impurity']) for feat in list(df_['Feature'].unique())]
@@ -212,7 +232,7 @@ def plot_gini_coefficients(feature_explosion: bool, feature_reduction: bool,) ->
                      fontsize=13)
 
     plt.tight_layout()
-    savepath = ROOT_DIR / 'results' / 'plots' / f'features_gini_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png'
+    savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png'
     plt.savefig(savepath, dpi=600)
     plt.show()
 

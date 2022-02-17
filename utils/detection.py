@@ -25,27 +25,22 @@ import pandas as pd
 from joblib import Parallel, delayed
 
 from constants import CHUNK_SIZE, HZ, HZ_HEART, N_JOBS, SD_DEV_THRESH
-from utils.hessels_classifier import classify_hessels2018
+from utils.hessels_classifier import classify_hessels2020
 
 # import remodnav
 # from I2MC import I2MC
 
 
-
-def run_hessels_classifier(files_et: List[Path], verbose: bool = True) -> None:
+def run_hessels_classifier(files_et: List[Path], verbose=11) -> None:
+    print(f'Using Hessels et al. (2020) slow/fast phase classifier on {len(files_et)} datasets.')
     if N_JOBS is None or N_JOBS == 1:  # Run single core
         # Loop through list of Paths
         for i, f in enumerate(files_et):
-            print(f'Classifying dataset {i} of {len(files_et)}')
-            events_df = classify_hessels2018(f, verbose=True)
-            events_df.to_csv(str(f).replace('.tsv', '-extracted.tsv'), delimiter='\t')
+            print(f'Classifying dataset {i + 1} of {len(files_et)}')
+            _ = classify_hessels2020(f, verbose=True)
 
     else:
-        results = Parallel(n_jobs=N_JOBS, backend='loky', verbose=verbose)(
-            delayed(classify_hessels2018)(f) for f in files_et)
-
-        for f, events_df in zip(files_et, results):
-            events_df.to_csv(str(f).replace('.tsv', '-extracted.tsv'), delimiter='\t')
+        _ = Parallel(n_jobs=N_JOBS, backend='loky', verbose=verbose)(delayed(classify_hessels2020)(f) for f in files_et)
 
 
 def detect_heartrate(signal: List[Any]) -> List[float]:
@@ -65,8 +60,6 @@ def split_into_chunks(df: pd.DataFrame, measurement_type: str) -> pd.DataFrame:
         sampling_rate = 250
     else:
         raise ValueError(f'split_into_chunks(): provide one of [heartrate, eyetracking, normdiff] as measurement_type.')
-
-    # sampling_rate = HZ_HEART if measurement_type == 'heartrate' else HZ
 
     if measurement_type == 'heartrate':
         timestamps = np.arange(0, len(df) / sampling_rate, 1 / sampling_rate)
