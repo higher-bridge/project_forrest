@@ -20,26 +20,28 @@ import pickle
 import random
 import time
 from itertools import repeat
-from typing import Dict, List, Tuple, Any
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
 from scipy.stats import scoreatpercentile
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression, LinearRegression
+from sklearn.inspection import permutation_importance
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import GridSearchCV, train_test_split, RandomizedSearchCV
+from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
+                                     train_test_split)
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import LabelBinarizer, StandardScaler, PolynomialFeatures
+from sklearn.preprocessing import (LabelBinarizer, PolynomialFeatures,
+                                   StandardScaler)
 from sklearn.utils import shuffle
 
-from constants import (DEP_VAR_BINARY, DIMENSIONS_PER_FEATURE, HYPERPARAMS, IND_VARS,
-                       PURSUIT_AS_FIX, ROOT_DIR, SEARCH_ITERATIONS, TEST_SIZE,
-                       N_JOBS, HYPERPARAMETER_SAMPLES,
-                       SEED, REGRESSION_TEST_SIZE)
+from constants import (DEP_VAR_BINARY, DIMENSIONS_PER_FEATURE,
+                       HYPERPARAMETER_SAMPLES, HYPERPARAMS, IND_VARS, N_JOBS,
+                       PURSUIT_AS_FIX, REGRESSION_TEST_SIZE, ROOT_DIR,
+                       SEARCH_ITERATIONS, SEED, TEST_SIZE)
 from utils.statistical_features import stat_features
-from utils.scenediff_helper import get_scenediffs
 
 
 def rename_types(x: str) -> str:
@@ -85,8 +87,6 @@ def rename_features(x: str) -> str:
 
 
 def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: bool = True) -> List[pd.DataFrame]:
-    # scene_diffs = list(get_scenediffs()['norm_diff'])
-
     new_dfs = []
 
     for df in dfs:
@@ -103,6 +103,7 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
 
         # Drop unnecessary columns
         df = df.drop(['Unnamed: 0', 'onset', 'start_x', 'start_y', 'end_x', 'end_y'], axis=1)
+        df = df.dropna()
 
         # Compute a counter and compute the mean
         df_counts = df.groupby(['chunk', 'label']).agg(['count', 'mean']).reset_index()
@@ -119,6 +120,7 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
         df_agg['label_hr'] = df_counts['label_hr']['mean']
         df_agg['label_hr_median'] = df_counts['label_hr_median']['mean']
         df_agg['label_hr_log'] = df_counts['label_hr_log']['mean']
+        df_agg['label_hr_medsplit'] = df_counts['label_hr_medsplit']['mean']
         df_agg['ID'] = df_counts['ID']['mean']
         df_agg['heartrate'] = df_counts['heartrate']['mean']
 
@@ -128,7 +130,6 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
 
         df_agg[DEP_VAR_BINARY] = df_agg[DEP_VAR_BINARY].apply(rename_labels)
         df_agg['ID'] = list(repeat(ID, len(df_agg)))
-        # df_agg['scene_diff'] = scene_diffs
 
         new_dfs.append(df_agg)
 
@@ -141,7 +142,7 @@ def flatten_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     cols_to_unify = []
     replacement_cols = dict()
     for col in flattened_df.columns:
-        if col[0] in ['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log']:
+        if col[0] in ['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log', 'label_hr_medsplit']:
             cols_to_unify.append(col)
 
             if col[0] not in list(replacement_cols.keys()):
@@ -192,7 +193,7 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
     # Columns are in format "feature descriptor move_type", e.g., "duration nanmean Fixation".
     # For each feature and move_type combination, run separate PCA over all of its descriptors. Then apply the PCA
     # to the test set too.
-    for move_type in ['Fixation', 'Pursuit', 'Saccade']:
+    for move_type in ['Fixation', 'Saccade']:
         for feature in IND_VARS:
             cols_to_use = [col for col in X_train.columns if move_type in col and feature in col]
 
@@ -200,8 +201,11 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
             df_section_test = X_test.loc[:, cols_to_use]
 
             pca = PCA(n_components=DIMENSIONS_PER_FEATURE, svd_solver='full', whiten=True)
-            pc_train = pca.fit_transform(df_section_train)
-            pc_test = pca.transform(df_section_test)
+            try:
+                pc_train = pca.fit_transform(df_section_train)
+                pc_test = pca.transform(df_section_test)
+            except Exception as e:
+                print(e)
 
             # Append each column of the array separately
             for i in range(DIMENSIONS_PER_FEATURE):
@@ -258,7 +262,8 @@ def prepare_data(df: pd.DataFrame,
     df = df.loc[df[DEP_VAR_BINARY] != 'normal']
 
     y_ = list(df[DEP_VAR_BINARY])
-    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log', 'chunk'], axis=1)
+    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log', 'label_hr_medsplit', 'chunk'],
+                     axis=1)
     column_names = X_base.columns
 
     X_base, y_ = remove_outliers(np.array(X_base), y_)
@@ -297,7 +302,8 @@ def prepare_data_continuous(df: pd.DataFrame,
     # Get heartrates
     y = list(df[y_feature])
 
-    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log', 'chunk'], axis=1)
+    X_base = df.drop(['ID', 'heartrate', 'label_hr', 'label_hr_median', 'label_hr_log', 'chunk', 'label_hr_medsplit'],
+                     axis=1)
     column_names = list(X_base.columns)
 
     X = np.array(X_base)
@@ -332,7 +338,14 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int,
                                feature_explosion: bool, feature_reduction: bool) -> Tuple[RandomizedSearchCV,
                                                                                           float,
                                                                                           str,
-                                                                                          List[str]]:
+                                                                                          List[str],
+                                                                                          pd.DataFrame]:
+
+    # try:
+    #     df = df.drop([c for c in df.columns if 'Pursuit' in c], axis=1)
+    # except Exception as e:
+    #     print(e)
+
     print(f'\nIteration {iteration_nr + 1}:')
     (X, X_test), (y, y_test), column_names = prepare_data(df,
                                                           feature_explosion=feature_explosion,
@@ -358,7 +371,15 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int,
                f'Duration: {round((time.time() - start) / 60, 2)} minutes.\n'
     print(to_write)
 
-    return param_search, test_score, to_write, column_names
+    # Compute feature importance of the best CV model
+    permutation_coefficients = permutation_importance(param_search.best_estimator_, X_test, y_test,
+                                                      scoring='roc_auc', n_repeats=10, n_jobs=N_JOBS)
+
+    perm_coefs = {f: round(m, 5) for f, m in zip(column_names, permutation_coefficients['importances_mean'])}
+    sorted_perm = sorted(perm_coefs.items(), key=lambda x: x[1], reverse=True)
+    sorted_perm = pd.DataFrame(dict(sorted_perm), index=[0])
+
+    return param_search, test_score, to_write, column_names, sorted_perm
 
 
 def run_model_search(dataframes: List[pd.DataFrame],
@@ -373,14 +394,14 @@ def run_model_search(dataframes: List[pd.DataFrame],
     cv_scores = []
     text_results = ''
     cv_results = pd.DataFrame()
-    gini_coefficients = pd.DataFrame()
+    coefficients = pd.DataFrame()
 
     # Run the model search a certain amount of times to correct for sampling biases
     for i in range(SEARCH_ITERATIONS):
-        model_search, test_score, to_write, column_names = run_model_search_iteration(df, i,
-                                                                                      feature_explosion=feature_explosion,
-                                                                                      feature_reduction=feature_reduction,
-                                                                                      )
+        model_search, test_score, to_write, column_names, coefficients_iteration = run_model_search_iteration(df, i,
+                                                                                    feature_explosion=feature_explosion,
+                                                                                    feature_reduction=feature_reduction,
+                                                                                    )
 
         best_estimators.append(model_search.best_estimator_)
         test_scores.append(test_score)
@@ -391,15 +412,15 @@ def run_model_search(dataframes: List[pd.DataFrame],
         cv_results_iteration['Iteration'] = [i] * len(cv_results_iteration)
         cv_results = cv_results.append(cv_results_iteration)
 
-        gini_coefficients_iteration = pd.DataFrame(model_search.best_estimator_.feature_importances_,
-                                                   index=column_names).T
-        gini_coefficients = gini_coefficients.append(gini_coefficients_iteration)
+        # gini_coefficients_iteration = pd.DataFrame(model_search.best_estimator_.feature_importances_,
+        #                                            index=column_names).T
+        coefficients = coefficients.append(coefficients_iteration)
 
     # Print mean score on test sets
     print(f'Mean overall CV score on {SEARCH_ITERATIONS} iterations:',
-          f'{round(np.mean(cv_scores), 3)} (SD = {round(np.std(cv_scores), 3)})',
+          f'{np.mean(cv_scores).round(3)} (SD = {np.std(cv_scores).round(3)})',
           f'Mean overall test score:',
-          f'{round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)})')
+          f'{np.mean(test_scores).round(3)} (SD = {np.std(test_scores).round(3)})')
 
     # Write performance in text
     with open(ROOT_DIR / 'results' / f'model_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
@@ -411,7 +432,7 @@ def run_model_search(dataframes: List[pd.DataFrame],
     cv_results.to_csv(ROOT_DIR / 'results' / f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save the gini coefficients
-    gini_coefficients.to_csv(
+    coefficients.to_csv(
         ROOT_DIR / 'results' / f'best_estimator_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save best estimators to pickle
@@ -467,8 +488,8 @@ def run_model_preselection(dataframes: List[pd.DataFrame],
         test_scores = scores[model_name]
 
         to_write += f'\n{model_name}: '
-        to_write += f'Training mean score = {round(np.mean(train_scores), 3)} (SD = {round(np.std(train_scores), 3)}). '
-        to_write += f'Testing mean score  = {round(np.mean(test_scores), 3)} (SD = {round(np.std(test_scores), 3)}).'
+        to_write += f'Training mean score = {np.mean(train_scores).round(3)} (SD = {np.std(train_scores).round(3)}). '
+        to_write += f'Testing mean score  = {np.mean(test_scores).round(3)} (SD = {np.std(test_scores).round(3)}).'
 
     with open(
             ROOT_DIR / 'results' / f'model_preliminary_performance_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.txt',
@@ -501,10 +522,10 @@ def get_scores_and_parameters(feature_explosion: bool, feature_reduction: bool, 
             feats_list.append(best_row['param_max_features'])
 
         print(f'Rank {rank}:',
-              f'Score {round(np.mean(cv_list), 3)}',
-              f'Trees {round(np.mean(trees_list), 3)}',
-              f'Depth {round(np.nanmean(depth_list), 3)}',
-              f'Feat {round(np.mean(feats_list), 3)}')
+              f'Score {np.mean(cv_list).round(3)}',
+              f'Trees {np.mean(trees_list).round(3)}',
+              f'Depth {np.nanmean(depth_list).round(3)}',
+              f'Feat {np.mean(feats_list).round(3)}')
 
 
 def run_regression_model(dataframes: List[pd.DataFrame],
@@ -542,10 +563,10 @@ def run_regression_model(dataframes: List[pd.DataFrame],
             best_model_score = test_score
             best_model = [model, X_test, y_test, column_names, round(test_score, 2)]
 
-    r2_train = round(np.mean(train_r2), 2)
-    r2_test = round(np.mean(test_r2), 2)
-    r2_train_sd = round(np.std(train_r2), 2)
-    r2_test_sd = round(np.std(test_r2), 2)
+    r2_train = np.mean(train_r2).round(2)
+    r2_test = np.mean(test_r2).round(2)
+    r2_train_sd = np.std(train_r2).round(2)
+    r2_test_sd = np.std(test_r2).round(2)
 
     # Write results as text
     to_write = f'Linear regression (50 runs) mean R-squared on train set = {r2_train} (SD = {r2_train_sd}). ' \
@@ -603,10 +624,10 @@ def run_regression_model_per_participant(dataframes: List[pd.DataFrame], IDs,
                 best_model_score = test_score
                 best_model = [model, X_test, y_test, column_names, round(test_score, 2)]
 
-        r2_train = round(np.mean(train_r2), 2)
-        r2_test = round(np.mean(test_r2), 2)
-        r2_train_sd = round(np.std(train_r2), 2)
-        r2_test_sd = round(np.std(test_r2), 2)
+        r2_train = np.mean(train_r2).round(2)
+        r2_test = np.mean(test_r2).round(2)
+        r2_train_sd = np.std(train_r2).round(2)
+        r2_test_sd = np.std(test_r2).round(2)
         train_samples = len(y)
         test_samples = len(y_test)
 
@@ -656,10 +677,34 @@ def compute_regression_stats(poly_degree: int,
         means_train.append(idd['R2 train mean'])
         means_test.append(idd['R2 test mean'])
 
-    mean_train = round(np.mean(means_train), 2)
-    mean_test = round(np.mean(means_test), 2)
+    mean_train = np.mean(means_train).round(2)
+    mean_test = np.mean(means_test).round(2)
 
     to_write = f'\nMean R-squared on training = {mean_train}, testing = {mean_test}'
     print(to_write)
 
     return to_write
+
+
+def print_overall_performance() -> None:
+    path = ROOT_DIR / 'results'
+
+    print('\nOVERALL RESULTS:')
+    for suffix in ['EXP0_RED0', 'EXP1_RED0', 'EXP1_RED1']:
+        file = path / f'model_performance_{suffix}.txt'
+        with open(file, 'r') as f:
+            results = f.read()
+
+        best_scores = []
+        test_scores = []
+        for line in results.split('\n'):
+            splitline = line.split('.')
+            # for i, x in enumerate(splitline):
+            #     print(i, x)
+            if len(splitline) > 2:
+                best_scores.append(float(f'0.{splitline[1]}'))
+                test_scores.append(float(f'0.{splitline[3]}'))
+
+        print(f'{suffix}:')
+        print(f'Best within CV: AUC={np.mean(best_scores).round(3)}, '
+              f'Overall test: AUC={np.mean(test_scores).round(3)}')

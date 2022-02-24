@@ -27,7 +27,7 @@ def _Range(a):
     if len(a) < 1:
         return np.nan
     a = np.array(a)
-    return a.max() - a.min()
+    return float(a.max() - a.min())
 
 
 def _tenthPerc(a):
@@ -36,7 +36,7 @@ def _tenthPerc(a):
     if len(a) < 1:
         return np.nan
     a = np.array(a)
-    return scipy.stats.scoreatpercentile(a, 10)
+    return float(scipy.stats.scoreatpercentile(a, 10))
 
 
 def _ninetythPerc(a):
@@ -45,7 +45,7 @@ def _ninetythPerc(a):
     if len(a) < 1:
         return np.nan
     a = np.array(a)
-    return scipy.stats.scoreatpercentile(a, 90)
+    return float(scipy.stats.scoreatpercentile(a, 90))
 
 
 def _interQ_range(a):
@@ -54,7 +54,7 @@ def _interQ_range(a):
     if len(a) < 1:
         return np.nan
     a = np.array(a)
-    return np.subtract(*np.percentile(a, [75, 25]))
+    return float(np.subtract(*np.percentile(a, [75, 25])))
 
 
 def _mean_abs_deviation(a):
@@ -63,7 +63,7 @@ def _mean_abs_deviation(a):
     if len(a) < 1:
         return np.nan
     a = np.array(a)
-    return np.mean(np.abs(a - a.mean()))
+    return float(np.mean(np.abs(a - a.mean())))
 
 
 def _energy(a):
@@ -72,7 +72,7 @@ def _energy(a):
     if len(a) < 1:
         return np.nan
     a = np.array(a)
-    return np.multiply(a, a).sum()
+    return float(np.multiply(a, a).sum())
 
 
 def _rms(a):
@@ -81,7 +81,7 @@ def _rms(a):
     if len(a) < 1:
         return np.nan
     a = np.array(a)
-    return np.sqrt(np.divide(np.multiply(a, a).sum(), a.size))
+    return float(np.sqrt(np.divide(np.multiply(a, a).sum(), a.size)))
 
 
 def _entropy(a):
@@ -91,7 +91,7 @@ def _entropy(a):
         return np.nan
     a = np.array(a)
     probs = np.divide(scipy.stats.itemfreq(a)[:, 1], a.size)
-    return scipy.stats.entropy(probs, base=2)
+    return float(scipy.stats.entropy(probs, base=2))
 
 
 def _uniformity(a):
@@ -101,12 +101,20 @@ def _uniformity(a):
     a = np.array(a)
 
     probs = np.divide(scipy.stats.itemfreq(a)[:, 1], a.size)
-    return np.multiply(probs, probs).sum()
+    return float(np.multiply(probs, probs).sum())
+
+
+def _Mean(a):
+    return float(np.nanmean(a))
+
+
+def _Variance(a):
+    return float(np.nanvar(a))
 
 
 stat_features = [
-    np.nanmean,
-    np.nanvar,
+    partial(_Mean),
+    partial(_Variance),
     partial(scipy.stats.skew, nan_policy='omit'),
     partial(scipy.stats.kurtosis, nan_policy='omit'),
     partial(_Range),

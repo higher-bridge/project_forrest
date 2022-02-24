@@ -24,18 +24,20 @@ from matplotlib import rcParams
 SEED     = 42                         # Set a seed for reproducibility
 ROOT_DIR = Path(__file__).parent  # Set root directory for the entire project (can usually be left alone)
 
-N_JOBS   = 10                      # Set number of CPU threads for fixation classification and model parameter search
+N_JOBS   = 4                      # Set number of CPU threads for fixation classification and model parameter search
 
-PX2DEG   = 0.01424                # Conversion factor from pixels to degrees vis. angle
+PX2DEG   = 0.0186                 # Conversion factor from pixels to degrees vis. angle
 HZ       = 1000.0                 # Sampling rate of eye tracker
 HZ_HEART = 500                    # Sampling rate of pulse oximetry
 
+HESSELS_SAVGOL_LEN  = 31          # Window length of Savitzky-Golay filter in pre-processing (default 31)
 HESSELS_THR         = 5000        # Initial slow/fast phase threshold (default 5000)
 HESSELS_LAMBDA      = 2.5         # Number of standard deviations (default 2.5)
 HESSELS_MAX_ITER    = 200         # Max iterations for threshold adaptation (default 200)
-HESSELS_WINDOW_SIZE = 60 * HZ     # Threshold adaptation window (default 8 seconds) * sampling rate
-HESSELS_MIN_AMP     = 1.0         # Minimal amplitude of fast/saccade candidates for merging slow/fixation candidates
-HESSELS_MIN_FIX     = 60          # Minimal fixation duration (from Hooge, I. T. C., Niehorster, D. C., Nyström, M.,
+HESSELS_WINDOW_SIZE = 8 * HZ      # Threshold adaptation window (default 8 seconds) * sampling rate
+HESSELS_MIN_AMP     = 1.0         # Minimal amplitude of fast candidates for merging slow candidates (default 1.0)
+HESSELS_MIN_FIX     = 60          # Minimal fixation duration (default 60)
+                                  # MIN_AMP and MIN_FIX come from Hooge, I. T. C., Niehorster, D. C., Nyström, M.,
                                   # Andersson, R., & Hessels, R. S. (2022). Fixation classification: how to merge and
                                   # select fixation candidates. Behavior Research Methods, 2001.
                                   # https://doi.org/10.3758/s13428-021-01723-1)
@@ -44,14 +46,15 @@ PURSUIT_AS_FIX = True             # Indicate whether smooth pursuits should be c
 PURSUIT_THR    = 2.0              # Minimal avg_vel to call something a pursuit
 
 CHUNK_SIZE    = 30                # (in seconds). Split up a participant's dataset into chunks
-SD_DEV_THRESH = .75               # Set threshold for high/low heartrate label as N standard deviation(s)
+SD_DEV_THRESH = .5                # Set threshold for high/low heartrate label as N standard deviation(s)
+DETREND_HR    = False             # Whether to linearly detrend heart rates over the whole viewing
 
-IND_VARS = ['duration', 'amp', 'peak_vel', 'avg_vel']  # Independent (predictive) variables
-DEP_VAR_BINARY = 'label_hr'                            # Dependent (to-predict) variable (for binary classfication)
+IND_VARS = ['duration', 'amp', 'peak_vel', 'med_vel']  # Independent (predictive) variables
+DEP_VAR_BINARY = 'label_hr_median'                     # Dependent (to-predict) variable (for binary classfication)
 
 # Set the range or distribution of hyperparameters for model search
 HYPERPARAMS = dict()
-HYPERPARAMS['n_estimators'] = list(np.arange(10, 160, step=1))
+HYPERPARAMS['n_estimators'] = list(np.arange(10, 161, step=1))
 HYPERPARAMS['max_depth']    = [None] + list(np.arange(1, 21, step=1))
 HYPERPARAMS['max_features'] = [None]  # + list(np.arange(1, 170, step=10))
 
@@ -60,8 +63,8 @@ TEST_SIZE            = .20
 REGRESSION_TEST_SIZE = .20
 
 # Model search parameters
-HYPERPARAMETER_SAMPLES = 10       # Set how often to sample the hyperparameter distributions in each iteration
-SEARCH_ITERATIONS      = 50       # Set how often to re-run the grid search
+HYPERPARAMETER_SAMPLES = 10      # Set how often to sample the hyperparameter distributions in each iteration
+SEARCH_ITERATIONS      = 2       # Set how often to re-run the grid search
 
 # Mind that the following features can be overridden if specified as a main() argument in main_pipeline.py
 USE_FEATURE_EXPLOSION  = False    # Whether to retrieve a wide range of statistical features over the data

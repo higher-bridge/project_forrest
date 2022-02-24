@@ -29,6 +29,7 @@ from typing import List, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy.signal import savgol_filter
 
 from constants import (HESSELS_LAMBDA, HESSELS_MAX_ITER, HESSELS_MIN_FIX, HESSELS_THR, HESSELS_WINDOW_SIZE,
                        HESSELS_MIN_AMP, PX2DEG, PURSUIT_AS_FIX, PURSUIT_THR, HZ)
@@ -41,7 +42,7 @@ def _get_amplitudes(start_x: np.ndarray, start_y: np.ndarray,
     amps = np.sqrt((end_x - start_x) ** 2 + (end_y - start_y) ** 2)
 
     if to_dva:
-        amps = amps * PX2DEG
+        amps *= PX2DEG
 
     return amps.round(3)
 
@@ -61,7 +62,7 @@ def _get_starts_ends(x: np.ndarray, y: np.ndarray, imarks: np.ndarray) -> Tuple[
     start_y.append(np.nan)
     end_y.append(np.nan)
 
-    return np.array(start_x), np.array(start_y), np.array(end_x), np.array(end_y)
+    return np.array(start_x).round(2), np.array(start_y).round(2), np.array(end_x).round(2), np.array(end_y).round(2)
 
 
 def _get_durations(smarks: np.ndarray) -> np.ndarray:
@@ -75,15 +76,12 @@ def _get_velocities(vel: np.ndarray, imarks: np.ndarray, stat: str, to_dva: bool
     for start, end in zip(imarks[:-1], imarks[1:]):
         vels = vel[start:end]
 
-        kernel = np.ones(20) / 20
-        vels_smoothed = np.convolve(vels, kernel, mode='same')
-
         if stat == 'peak':
-            velocities.append(np.max(vels_smoothed))
+            velocities.append(np.max(vels))
         elif stat == 'mean':
-            velocities.append(np.nanmean(vels_smoothed))
+            velocities.append(np.nanmean(vels))
         elif stat == 'median':
-            velocities.append(np.nanmedian(vels_smoothed))
+            velocities.append(np.nanmedian(vels))
         else:
             velocities.append(np.nan)
             raise UserWarning(f'Cannot compute {stat} of velocities')
@@ -105,8 +103,8 @@ def _split_slow_phase(df: pd.DataFrame) -> pd.DataFrame:
 
     # Rename 'faster' slow phases (above PURSUIT_THR) to 'purs'
     for i, v in enumerate(vel):
-        if label[i] == 'slow' and v > PURSUIT_THR:
-            label[i] = 'purs'
+        if label[i] == 'FIXA' and v > PURSUIT_THR:
+            label[i] = 'PURS'
 
     df['label'] = label
 
@@ -157,7 +155,7 @@ def detect_velocity_python(x: np.ndarray, y: np.ndarray, ts: np.ndarray) -> np.n
     return vel
 
 
-def detect_switches(qvel: np.ndarray) -> Tuple[np.array, np.array]:
+def detect_switches(qvel: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     v = np.full(len(qvel) + 2, False, dtype=bool)
     v[1:-1] = qvel
     v = v.astype(int)
@@ -166,29 +164,11 @@ def detect_switches(qvel: np.ndarray) -> Tuple[np.array, np.array]:
     v1 = v[1:]
     switches = v0 - v1
 
-    # If False - True (0 - 1), switch_on, if True - False (1 - 0), switch_off
+    # If False - True (0 - 1): switch_on, if True - False (1 - 0): switch_off
     switch_on = np.argwhere(switches == -1)
     switch_off = np.argwhere(switches == 1) - 1  # Subtract 1 from each element
 
-    return switch_on, switch_off
-
-
-def fmark(vel: np.ndarray, ts: np.ndarray, thr: np.ndarray) -> np.array:
-    qvel = vel < thr
-
-    # Get indices of starts and ends of fixation candidates
-    switch_on, switch_off = detect_switches(qvel)
-    time_on, time_off = ts[switch_on.ravel()], ts[switch_off.ravel()]
-
-    # Get durations of candidates and find at which indices they are long enough. Then select only those.
-    time_deltas = time_off - time_on
-    qfix = np.argwhere(time_deltas > HESSELS_MIN_FIX)
-    time_on = time_on[qfix].ravel()
-    time_off = time_off[qfix].ravel()
-
-    # Combine the two lists and sort the timestamps
-    times_sorted = sorted(np.concatenate([time_on, time_off]))
-    return times_sorted
+    return switch_on.ravel(), switch_off.ravel()
 
 
 def merge_fix_candidates(idxs: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -210,6 +190,25 @@ def merge_fix_candidates(idxs: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.n
     return keep_idxs
 
 
+def fmark(vel: np.ndarray, ts: np.ndarray, thr: np.ndarray) -> np.ndarray:
+    qvel = vel < thr
+
+    # Get indices of starts and ends of fixation candidates
+    switch_on, switch_off = detect_switches(qvel)
+    time_on, time_off = ts[switch_on], ts[switch_off]
+
+    # Get durations of candidates and find at which indices they are long enough. Then select only those.
+    time_deltas = time_off - time_on
+    qfix = np.argwhere(time_deltas > HESSELS_MIN_FIX)
+    time_on = time_on[qfix].ravel()
+    time_off = time_off[qfix].ravel()
+
+    # Combine the two lists and sort the timestamps
+    times_sorted = sorted(np.concatenate([time_on, time_off]))
+
+    return np.array(times_sorted)
+
+
 def threshold(vel: np.ndarray) -> np.array:
     # Retrieve where vel is neither below threshold (and not nan), and get indices of those positions
     valid_idxs = np.argwhere(vel < HESSELS_THR).ravel()
@@ -228,7 +227,7 @@ def threshold(vel: np.ndarray) -> np.array:
         thr2 = mean_vel + (HESSELS_LAMBDA * std_vel)
         valid_idxs = np.argwhere(vel < thr2).ravel()
 
-        if round(thr2, 6) == round(prev_thr, 6) or counter >= HESSELS_MAX_ITER:
+        if round(thr2, 8) == round(prev_thr, 8) or counter >= HESSELS_MAX_ITER:
             break
 
         mean_vel = np.nanmean(vel[valid_idxs])
@@ -265,11 +264,18 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
     :param verbose: A bool indicating whether to print progress
     :return: A bool which indicates success or failure. Dataframe is immediately written to file
     """
+    np.seterr(divide='ignore', invalid='ignore', )
+
     try:
         df = load_data(f, delimiter, header)
-        x = np.array(df['x'])
-        y = np.array(df['y'])
-        ts = np.array(df['time'])
+        x_before = np.array(df['x'])
+        y_before = np.array(df['y'])
+        ts = np.array(df['time']).astype(int)
+
+        filter_len = 31
+        x = savgol_filter(x_before, filter_len, 2, mode='nearest')
+        y = savgol_filter(y_before, filter_len, 2, mode='nearest')
+        # plot_timeseries(x_before[:1000], x[:1000], str(f.stem), smoothing=f'savgol ({filter_len}, 2)')
 
         # Retrieve euclidean velocity from each datapoint to the next
         # vx = detect_velocity(x, ts)
@@ -295,7 +301,7 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
                 print(f'Processed {i} of {len(start_indices)} threshold windows '
                       f'({round((i / len(start_indices)) * 100)}%)', end='\r')
 
-        thr = thr / ninwin
+        thr /= ninwin
 
         emarks = fmark(vel, ts, thr)  # Get slow events
 
@@ -319,9 +325,9 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
         phase_types = []
         for i, _ in enumerate(imarks):
             if i % 2 == 0:
-                phase_types.append('slow')
+                phase_types.append('FIXA')
             else:
-                phase_types.append('fast')
+                phase_types.append('SACC')
 
         # Check for too much missing data
         for i in range(len(imarks) - 1):
@@ -333,8 +339,8 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
         # Retrieve some extra information from the data
         start_x, start_y, end_x, end_y = _get_starts_ends(x, y, imarks)
         results = {'label':     phase_types,
-                   'onset':     smarks,
-                   'duration':  _get_durations(smarks),
+                   'onset':     smarks / 1000,
+                   'duration':  _get_durations(smarks) / 1000,
                    'amp':       _get_amplitudes(start_x, start_y, end_x, end_y),
                    'avg_vel':   _get_velocities(vel, imarks, 'mean'),
                    'med_vel':   _get_velocities(vel, imarks, 'median'),
@@ -345,8 +351,8 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
                    'end_y':     end_y}
 
         results = pd.DataFrame(results)
-        results = results.loc[results['duration'] >= 30.0]  # Remove all rows where duration < 30 ms
-        results = results.loc[results['duration'] <= 5000]
+        results = results.loc[results['duration'] >= .03]  # Remove all rows where duration < 30 ms
+        results = results.loc[results['duration'] <= 5.0]
         results = results.loc[results['peak_vel'] <= 1000]
 
         if not PURSUIT_AS_FIX:

@@ -31,17 +31,10 @@ def main() -> None:
 
     # Retrieve file names and run fixation detection with (takes a while. Number of CPU cores to use
     # can be specified in constants.py). Use if fixation extraction has not been done before and/or if *-extracted.tsv
-    # files are not available
+    # files are not available:
     files_et = get_list_of_files('eyetracking', '*physio.tsv')
-
-    ### DEBUG ###
-    from random import sample
-    files_et = sample(files_et, 8)
-
     run_hessels_classifier(files_et)
     plot_phase_distributions(files_et)
-    return
-
     concatenate_files('eyetracking', '*-extracted.tsv')
 
     # Load oculomotor features

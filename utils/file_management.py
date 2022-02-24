@@ -100,8 +100,6 @@ def load_merged_files(measurement_type: str, suffix: str = '*-merged.tsv') -> Tu
 
     IDs = [f.name[:2] for f in files]
 
-    print(f'Loading {len(files)} files of type {measurement_type}: {IDs}')
-
     if measurement_type == 'heartrate':
         dfs = [pd.read_csv(f, sep='\t', header=None) for f in files]
     else:

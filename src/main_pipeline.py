@@ -15,33 +15,33 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-import numpy as np
+
 import pandas as pd
 
+from constants import (DEP_VAR_BINARY, REGRESSION_POLY_DEG,
+                       USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION)
 from utils.file_management import load_merged_files, write_to_tsv
-from utils.pipeline_helper import (get_scores_and_parameters,
-                                   group_by_chunks, run_model_preselection,
-                                   run_model_search, run_regression_model,
+from utils.pipeline_helper import (get_scores_and_parameters, group_by_chunks,
+                                   run_model_preselection, run_model_search,
+                                   run_regression_model,
                                    run_regression_model_per_participant)
-from utils.plots import (plot_feature_hist, plot_heartrate_hist,
-                         plot_heartrate_over_time, plot_gini_coefficients,
-                         plot_linear_predictions, plot_linear_predictions_scatter)
-from constants import USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION, REGRESSION_POLY_DEG, DEP_VAR_BINARY
+from utils.plots import (plot_feature_hist, plot_feature_importance,
+                         plot_heartrate_hist, plot_heartrate_over_time,
+                         plot_linear_predictions_scatter)
 
 
-def main(group: bool = False,
-         plot: bool = True,
-         process: bool = True,
-         preselection: bool = True,
-         search: bool = True,
-         regression: bool = True,
-         regression_plot: bool = True,
-         regression_per_participant: bool = True,
-         binary_label: str = None,
-         feature_explosion: bool = None,
-         feature_reduction: bool = None,
-         poly_degree: int = None) -> None:
-
+def run_single_pipeline(group: bool = False,
+                        plot: bool = True,
+                        process: bool = True,
+                        preselection: bool = True,
+                        search: bool = True,
+                        regression: bool = True,
+                        regression_plot: bool = False,
+                        regression_per_participant: bool = True,
+                        binary_label: str = None,
+                        feature_explosion: bool = None,
+                        feature_reduction: bool = None,
+                        poly_degree: int = None) -> None:
     # Check whether these parameters are specified, otherwise grab them from constants.py
     if feature_explosion is None or feature_reduction is None:
         feature_explosion, feature_reduction = USE_FEATURE_EXPLOSION, USE_FEATURE_REDUCTION
@@ -69,16 +69,23 @@ def main(group: bool = False,
         plot_heartrate_over_time(combined_df, feature='heartrate')
 
     # Pre-process data
+    if not process:
+        try:
+            dataframes_exploded, IDs = load_merged_files('eyetracking',
+                                                         suffix=f'*exploded-EXP{int(feature_explosion)}_RED{int(feature_reduction)}.tsv')
+        except:
+            print('run_single_pipeline(): "process" was set to False, but no exploded data available. '
+                  'Trying with pre-processing...')
+            process = True
+
     if process:
         dataframes_exploded = group_by_chunks(dataframes, feature_explosion=feature_explosion, flatten=True)
-        write_to_tsv(dataframes_exploded, IDs, 'eyetracking', f'-exploded-EXP{int(feature_explosion)}_RED{int(feature_reduction)}.tsv')
-
-    # Or load the pre-processed data if available
-    else:
-        dataframes_exploded, IDs = load_merged_files('eyetracking', suffix='*-exploded.tsv')
+        write_to_tsv(dataframes_exploded, IDs, 'eyetracking',
+                     f'-exploded-EXP{int(feature_explosion)}_RED{int(feature_reduction)}.tsv')
 
     # Model
-    print(f'Running models with EXPLOSION={feature_explosion}, REDUCTION={feature_reduction}, binary label={binary_label}.')
+    print(f'Running models with EXPLOSION={feature_explosion}, REDUCTION={feature_reduction}, '
+          f'binary label={binary_label}.')
     if preselection:
         run_model_preselection(dataframes_exploded,
                                feature_explosion=feature_explosion,
@@ -93,9 +100,9 @@ def main(group: bool = False,
 
         # Plot results
         try:
-            plot_gini_coefficients(feature_explosion=feature_explosion, feature_reduction=feature_reduction)
-        except:
-            print('Could not plot gini coefficients')
+            plot_feature_importance(feature_explosion=feature_explosion, feature_reduction=feature_reduction)
+        except Exception as e:
+            print(f'Could not plot feature importance (EXP{feature_explosion}, RED{feature_reduction}): {e}')
 
     if regression:
         run_regression_model(dataframes_exploded,
@@ -105,7 +112,8 @@ def main(group: bool = False,
                              y_feature='heartrate')
 
         if regression_plot:
-            plot_linear_predictions_scatter(feature_explosion=feature_explosion, feature_reduction=feature_reduction, poly_deg=poly_degree)
+            plot_linear_predictions_scatter(feature_explosion=feature_explosion, feature_reduction=feature_reduction,
+                                            poly_deg=poly_degree)
 
         if regression_per_participant:
             run_regression_model_per_participant(dataframes_exploded, IDs,
@@ -115,4 +123,5 @@ def main(group: bool = False,
                                                  y_feature='heartrate')
 
 
-main()
+if __name__ == '__main__':
+    run_single_pipeline(group=True)
