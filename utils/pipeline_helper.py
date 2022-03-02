@@ -508,7 +508,6 @@ def get_scores_and_parameters(feature_explosion: bool, feature_reduction: bool, 
         cv_list = []
         trees_list = []
         depth_list = []
-        feats_list = []
 
         for i in num_iterations:
             df_ = df.loc[df['Iteration'] == i]
@@ -519,13 +518,11 @@ def get_scores_and_parameters(feature_explosion: bool, feature_reduction: bool, 
             cv_list.append(best_row['mean_test_score'])
             trees_list.append(best_row['param_n_estimators'])
             depth_list.append(best_row['param_max_depth'])
-            feats_list.append(best_row['param_max_features'])
 
         print(f'Rank {rank}:',
               f'Score {np.mean(cv_list).round(3)}',
               f'Trees {np.mean(trees_list).round(3)}',
-              f'Depth {np.nanmean(depth_list).round(3)}',
-              f'Feat {np.mean(feats_list).round(3)}')
+              f'Depth {np.nanmean(depth_list).round(3)}')
 
 
 def run_regression_model(dataframes: List[pd.DataFrame],
@@ -706,5 +703,5 @@ def print_overall_performance() -> None:
                 test_scores.append(float(f'0.{splitline[3]}'))
 
         print(f'{suffix}:')
-        print(f'Best within CV: AUC={np.mean(best_scores).round(3)}, '
-              f'Overall test: AUC={np.mean(test_scores).round(3)}')
+        print(f'Best within CV: AUC={np.mean(best_scores).round(3)} ({np.std(best_scores).round(3)}), '
+              f'Overall test: AUC={np.mean(test_scores).round(3)} ({np.std(test_scores).round(3)})')

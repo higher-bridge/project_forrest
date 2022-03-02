@@ -24,7 +24,7 @@ from matplotlib import rcParams
 SEED     = 42                         # Set a seed for reproducibility
 ROOT_DIR = Path(__file__).parent  # Set root directory for the entire project (can usually be left alone)
 
-N_JOBS   = 4                      # Set number of CPU threads for fixation classification and model parameter search
+N_JOBS   = 10                      # Set number of CPU threads for fixation classification and model parameter search
 
 PX2DEG   = 0.0186                 # Conversion factor from pixels to degrees vis. angle
 HZ       = 1000.0                 # Sampling rate of eye tracker
@@ -52,19 +52,19 @@ DETREND_HR    = False             # Whether to linearly detrend heart rates over
 IND_VARS = ['duration', 'amp', 'peak_vel', 'med_vel']  # Independent (predictive) variables
 DEP_VAR_BINARY = 'label_hr_median'                     # Dependent (to-predict) variable (for binary classfication)
 
+# Train/test split sizes
+TEST_SIZE            = .2
+REGRESSION_TEST_SIZE = .2
+
 # Set the range or distribution of hyperparameters for model search
 HYPERPARAMS = dict()
-HYPERPARAMS['n_estimators'] = list(np.arange(10, 161, step=1))
-HYPERPARAMS['max_depth']    = [None] + list(np.arange(1, 21, step=1))
-HYPERPARAMS['max_features'] = [None]  # + list(np.arange(1, 170, step=10))
-
-# Train/test split sizes
-TEST_SIZE            = .20
-REGRESSION_TEST_SIZE = .20
+HYPERPARAMS['n_estimators'] = list(np.arange(10, 201, step=1))
+HYPERPARAMS['max_depth']    = [None] + list(np.arange(1, 31, step=1))
+# HYPERPARAMS['max_features'] = [None]
 
 # Model search parameters
-HYPERPARAMETER_SAMPLES = 10      # Set how often to sample the hyperparameter distributions in each iteration
-SEARCH_ITERATIONS      = 2       # Set how often to re-run the grid search
+HYPERPARAMETER_SAMPLES = 500       # Set how often to sample the hyperparameter distributions in each iteration
+SEARCH_ITERATIONS      = 50        # Set how often to re-run the search
 
 # Mind that the following features can be overridden if specified as a main() argument in main_pipeline.py
 USE_FEATURE_EXPLOSION  = False    # Whether to retrieve a wide range of statistical features over the data
