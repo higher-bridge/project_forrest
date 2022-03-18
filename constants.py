@@ -56,15 +56,15 @@ DEP_VAR_BINARY = 'label_hr_median'                     # Dependent (to-predict) 
 HYPERPARAMS = dict()
 HYPERPARAMS['n_estimators'] = list(np.arange(10, 161, step=1))
 HYPERPARAMS['max_depth']    = [None] + list(np.arange(1, 21, step=1))
-HYPERPARAMS['max_features'] = [None]  # + list(np.arange(1, 170, step=10))
+HYPERPARAMS['max_features'] = [None]
 
 # Train/test split sizes
 TEST_SIZE            = .20
 REGRESSION_TEST_SIZE = .20
 
 # Model search parameters
-HYPERPARAMETER_SAMPLES = 10      # Set how often to sample the hyperparameter distributions in each iteration
-SEARCH_ITERATIONS      = 2       # Set how often to re-run the grid search
+HYPERPARAMETER_SAMPLES = 500      # Set how often to sample the hyperparameter distributions in each iteration
+SEARCH_ITERATIONS      = 50       # Set how often to re-run the grid search
 
 # Mind that the following features can be overridden if specified as a main() argument in main_pipeline.py
 USE_FEATURE_EXPLOSION  = False    # Whether to retrieve a wide range of statistical features over the data

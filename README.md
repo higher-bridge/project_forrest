@@ -2,7 +2,7 @@
 
 This repository contains the code and outcome measures for the following manuscript (link will be added once manuscript becomes available):
 
-**Seeing the Forrest through the trees: Random forests predict heart rate based on oculomotor features in a naturalistic viewing task.**
+**Seeing the Forrest through the trees: Oculomotor movement is linked to heart rate**
 Alex J. Hoogerbrugge, Christoph Strauch, Zoril A. Oláh, Edwin S. Dalmaijer, Tanja C.W. Nijboer, Stefan Van der Stigchel
 
 
@@ -24,10 +24,6 @@ Alex J. Hoogerbrugge, Christoph Strauch, Zoril A. Oláh, Edwin S. Dalmaijer, Tan
 - Then, run ```src/main_pipeline.py```. This has been designed to run separately from the dataloader, so that the dataloader only needs to be run once. The main pipeline can also take some time to run (depending on ```N_JOBS```, ```HYPERPARAMETER_SAMPLES``` and ```SEARCH_ITERATIONS```). 
     - It's possible to comment and uncomment sections of code if you're only looking to reproduce certain analyses.
     - Again, static variables can be changed in ```constants.py```. 
-
-
-### Known issues
-* The feature importance plot currently does not work with feature explosion.
 
 
 ### Reproducibility in case of failed environment build

@@ -26,8 +26,7 @@ from utils.pipeline_helper import (get_scores_and_parameters, group_by_chunks,
                                    run_regression_model,
                                    run_regression_model_per_participant)
 from utils.plots import (plot_feature_hist, plot_feature_importance,
-                         plot_heartrate_hist, plot_heartrate_over_time,
-                         plot_linear_predictions_scatter)
+                         plot_heartrate_hist, plot_heartrate_over_time)
 
 
 def run_single_pipeline(group: bool = False,
@@ -110,10 +109,6 @@ def run_single_pipeline(group: bool = False,
                              feature_reduction=feature_reduction,
                              poly_degree=poly_degree,
                              y_feature='heartrate')
-
-        if regression_plot:
-            plot_linear_predictions_scatter(feature_explosion=feature_explosion, feature_reduction=feature_reduction,
-                                            poly_deg=poly_degree)
 
         if regression_per_participant:
             run_regression_model_per_participant(dataframes_exploded, IDs,

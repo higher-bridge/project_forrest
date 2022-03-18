@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import pickle
-import random
 import time
 from itertools import repeat
 from typing import Any, Dict, List, Tuple
@@ -30,7 +29,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import (GridSearchCV, RandomizedSearchCV,
+from sklearn.model_selection import (RandomizedSearchCV,
                                      train_test_split)
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import (LabelBinarizer, PolynomialFeatures,
@@ -341,11 +340,6 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int,
                                                                                           List[str],
                                                                                           pd.DataFrame]:
 
-    # try:
-    #     df = df.drop([c for c in df.columns if 'Pursuit' in c], axis=1)
-    # except Exception as e:
-    #     print(e)
-
     print(f'\nIteration {iteration_nr + 1}:')
     (X, X_test), (y, y_test), column_names = prepare_data(df,
                                                           feature_explosion=feature_explosion,
@@ -412,8 +406,6 @@ def run_model_search(dataframes: List[pd.DataFrame],
         cv_results_iteration['Iteration'] = [i] * len(cv_results_iteration)
         cv_results = cv_results.append(cv_results_iteration)
 
-        # gini_coefficients_iteration = pd.DataFrame(model_search.best_estimator_.feature_importances_,
-        #                                            index=column_names).T
         coefficients = coefficients.append(coefficients_iteration)
 
     # Print mean score on test sets
@@ -699,8 +691,7 @@ def print_overall_performance() -> None:
         test_scores = []
         for line in results.split('\n'):
             splitline = line.split('.')
-            # for i, x in enumerate(splitline):
-            #     print(i, x)
+
             if len(splitline) > 2:
                 best_scores.append(float(f'0.{splitline[1]}'))
                 test_scores.append(float(f'0.{splitline[3]}'))

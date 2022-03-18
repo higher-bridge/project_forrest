@@ -249,9 +249,6 @@ def load_data(f: Path, delimiter: str, header) -> pd.DataFrame:
     # Data is steady 1kHz, but has no timestamps, so add (in ms)
     df['time'] = np.arange(len(df))
 
-    ### DEBUG ###
-    # df = df.iloc[0: int(len(df) * .10)]
-
     return df
 
 
@@ -275,7 +272,6 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
         filter_len = 31
         x = savgol_filter(x_before, filter_len, 2, mode='nearest')
         y = savgol_filter(y_before, filter_len, 2, mode='nearest')
-        # plot_timeseries(x_before[:1000], x[:1000], str(f.stem), smoothing=f'savgol ({filter_len}, 2)')
 
         # Retrieve euclidean velocity from each datapoint to the next
         # vx = detect_velocity(x, ts)

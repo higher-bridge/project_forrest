@@ -28,9 +28,6 @@ from joblib import Parallel, delayed
 from constants import CHUNK_SIZE, HZ, HZ_HEART, N_JOBS, SD_DEV_THRESH, DETREND_HR
 from utils.hessels_classifier import classify_hessels2020
 
-# import remodnav
-# from I2MC import I2MC
-
 
 def run_hessels_classifier(files_et: List[Path], verbose=11) -> None:
     print(f'Using Hessels et al. (2020) slow/fast phase classifier on {len(files_et)} datasets.')
@@ -165,70 +162,3 @@ def add_bpm_to_eyetracking(dfs: List[pd.DataFrame], IDs: List[str], bpm_dict: Di
         new_dfs.append(df)
 
     return new_dfs
-
-# def run_remodnav(files_et: List[Path], verbose: bool = True) -> None:
-#     # REMoDNaV returns nothing but writes immediately to file
-#     if N_JOBS is None or N_JOBS == 1:  # Run single core
-#         results = []
-#
-#         for f in files_et:
-#             fixations = remodnav.main([None,
-#                                        str(f),
-#                                        str(f).replace('.tsv', '-extracted.tsv'),
-#                                        str(PX2DEG),
-#                                        str(HZ),
-#                                        '--min-fixation-duration', '0.06',
-#                                        '--pursuit-velthresh', '2.0'])
-#             results.append(fixations)
-#
-#     else:  # Run with parallelism
-#         arg_list = []
-#         for f in files_et:
-#             in_file = str(f)
-#             out_file = str(f).replace('.tsv', '-extracted.tsv')
-#
-#             arg_list.append([None,
-#                              in_file,
-#                              out_file,
-#                              str(PX2DEG),
-#                              str(HZ),
-#                              '--min-fixation-duration', '0.06',
-#                              '--pursuit-velthresh', '2.0'])
-#
-#         results = Parallel(n_jobs=N_JOBS, backend='loky', verbose=verbose)(
-#             delayed(remodnav.main)(args) for args in arg_list)
-
-
-# def run_i2mc(files_et: List[Path]) -> None:
-#     options = dict()
-#     options['xres'] = 1280
-#     options['yres'] = 546  # 1024 full screen
-#     options['missingx'] = np.nan
-#     options['missingy'] = np.nan
-#     options['freq'] = 1000
-#     options['disttoscreen'] = 63
-#
-#     # For the full screen:
-#     # options['scrSz'] = (26.5, 21.2)  # 1280px / 1024px = 1.25 (5:4 ratio). 26.5 cm width -> 33.9 diag / 21.2 height
-#     # Only the actual stimulus (video content), to which gaze coordinates were mapped:
-#     options['scrSz'] = (26.5, 11.3)   # 1280px / 546px = 2.35 (47:20 ratio). 26.5 cm width -> 28.8 diag / 11.3 height
-#
-#     options['minFixDur'] = 60.0
-#
-#     # Loop through list of Paths
-#     for f in files_et:
-#         df = pd.read_csv(f, delimiter='\t', header=None)
-#
-#         # Add colnames, drop last two
-#         df.columns = ['L_X', 'L_Y', 'pupilsize', 'frameno']
-#         df = df.drop(['pupilsize', 'frameno'], axis=1)
-#
-#         # Data is steady 1kHz, but has no timestamps, so add (in ms)
-#         df['time'] = np.arange(len(df))
-#
-#         # Run I2MC fixation detection
-#         events, _, _ = I2MC(df, options)
-#
-#         # Save to df
-#         events_df = pd.DataFrame(events)
-#         events_df.to_csv(str(f).replace('.tsv', '-extracted.tsv'), delimiter='\t')

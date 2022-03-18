@@ -70,7 +70,7 @@ def plot_timeseries(x: np.ndarray, x_after: np.ndarray, f: str, smoothing: str) 
     plt.close(p)
 
 
-def plot_feature_hist(df: pd.DataFrame) -> None:
+def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
     features = IND_VARS + ['count']
     move_types = list(df['label'].unique())
 
@@ -127,7 +127,11 @@ def plot_feature_hist(df: pd.DataFrame) -> None:
 
     plt.tight_layout()
     save_path = ROOT_DIR / 'results' / 'plots' / f'feature_hist.png'
-    plt.savefig(save_path, dpi=600)
+    plt.savefig(save_path, dpi=dpi)
+
+    save_path = ROOT_DIR / 'results' / 'plots' / f'feature_hist.tiff'
+    plt.savefig(save_path, dpi=dpi)
+
     plt.show()
 
 
@@ -147,10 +151,6 @@ def plot_heartrate_hist(df: pd.DataFrame) -> None:
 
         axes[i].set_xlabel('')
         axes[i].set_ylabel('')
-        # axes[i].set_xlim((50, 105))
-        # axes[i].set_yticks(list())
-
-        # axes[i].set_title(ID)
 
     plt.tight_layout()
     save_path = ROOT_DIR / 'results' / 'plots' / 'heartrate_hist.png'
@@ -212,7 +212,7 @@ def test_if_significant_from_mean(values: pd.Series, overall_mean: np.array) -> 
         return False
 
 
-def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, ) -> None:
+def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, dpi=300) -> None:
     path = ROOT_DIR / 'results' / f'best_estimator_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv'
     df = pd.read_csv(path)
     df = df.drop(['Unnamed: 0'], axis=1)
@@ -235,7 +235,7 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, ) 
                 capsize=.5, errwidth=1.2,
                 orient='h')
     plt.axvline(x=np.mean(df_['Feature importance']), linestyle='--', color='red')
-    plt.xlabel(f'Coefficient (explosion={feature_explosion}, reduction={feature_reduction})')
+    plt.xlabel(f'Feature importance coefficient')  # (explosion={feature_explosion}, reduction={feature_reduction})')
 
     # Compute the mean impurity for each feature, so we can use it later to determine the max and plot a * besides it
     feature_means = [np.mean(df_.loc[df_['Feature'] == feat]['Feature importance']) for feat in list(df_['Feature'].unique())]
@@ -253,7 +253,11 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, ) 
 
     plt.tight_layout()
     savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png'
-    plt.savefig(savepath, dpi=600)
+    plt.savefig(savepath, dpi=dpi)
+
+    savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.tiff'
+    plt.savefig(savepath, dpi=dpi)
+
     plt.show()
 
 
@@ -264,72 +268,3 @@ def compute_subplot_layout(columns: int) -> Tuple[int, int]:
         return int(columns / 3), 3
     else:
         return int(columns / 2), 2
-
-
-def plot_linear_predictions(feature_explosion: bool, feature_reduction: bool, poly_deg: int) -> None:
-    model, X, y, column_names, r2 = pickle.load(
-        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{poly_deg}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p', 'rb')
-    )
-
-    if model is None:
-        raise Warning('There was no best regression model.')
-
-    y_pred = model.predict(X)
-
-    palette = sns.color_palette()
-
-    f = plt.figure(figsize=(7.5, 10))
-    # rows, cols = compute_subplot_layout(len(column_names))
-    # axes = [f.add_subplot(rows, cols, i + 1) for i in range(len(column_names))]
-
-    # for i, col in enumerate(column_names):
-    rows, cols = compute_subplot_layout(X.shape[1])
-    axes = [f.add_subplot(rows, cols, i + 1) for i in range(X.shape[1])]
-
-    for i in range(X.shape[1]):
-        x = X[:, i]
-        x_lin = np.linspace(min(x), max(x), num=100)
-        coef = list(model.coef_)[i]
-        intc = model.intercept_
-        y_pred = [v * coef + intc for v in x_lin]
-        # sns.lineplot(x=x, y=y, ax=axes[i], color=palette[0])
-        sns.lineplot(x=x_lin, y=y_pred, ax=axes[i], color=palette[0], zorder=10)
-        # sns.scatterplot(x=x, y=y, ax=axes[i], color=palette[1])
-
-        # axes[i].set_xlabel(col)
-
-        if i % cols == 0:
-            axes[i].set_ylabel('Predicted heart rate')
-        else:
-            axes[i].set_ylabel('')
-
-        axes[i].set_ylim((50, 100))
-
-    f.tight_layout()
-    f.show()
-
-
-def plot_linear_predictions_scatter(feature_explosion: bool, feature_reduction: bool, poly_deg) -> None:
-    model, X, y, _, r2 = pickle.load(
-        open(ROOT_DIR / 'results' / f'linear_estimator_POLYDEG_{poly_deg}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.p', 'rb')
-    )
-
-    if model is None:
-        raise Warning('There was no best regression model.')
-
-    y_pred = model.predict(X)
-
-    plt.figure()
-    sns.scatterplot(x=y, y=y_pred, label=f'R2 = {r2}')
-
-    plt.xlabel('True heart rate')
-    plt.ylabel('Predicted heart rate')
-
-    limits = (50, 100)
-    plt.xlim(limits)
-    plt.ylim(limits)
-
-    plt.tight_layout()
-    plt.savefig(ROOT_DIR / 'results' / 'plots' / f'linear_estimator_POLYDEG_{poly_deg}_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png',
-                dpi=600)
-    plt.show()
