@@ -32,7 +32,7 @@ import pandas as pd
 from scipy.signal import savgol_filter
 
 from constants import (HESSELS_LAMBDA, HESSELS_MAX_ITER, HESSELS_MIN_FIX, HESSELS_THR, HESSELS_WINDOW_SIZE,
-                       HESSELS_MIN_AMP, PX2DEG, PURSUIT_AS_FIX, PURSUIT_THR, HZ)
+                       HESSELS_MIN_AMP, HESSELS_SAVGOL_LEN, PX2DEG, PURSUIT_AS_FIX, PURSUIT_THR, HZ)
 
 
 ### STATISTICS FUNCTIONS ###
@@ -217,7 +217,6 @@ def threshold(vel: np.ndarray) -> np.array:
     std_vel = np.nanstd(vel[valid_idxs])
 
     if np.isnan(mean_vel):
-        # print('Too much data loss. Could not compute velocity')
         return np.array([np.nan] * len(vel))
 
     counter = 0
@@ -227,7 +226,8 @@ def threshold(vel: np.ndarray) -> np.array:
         thr2 = mean_vel + (HESSELS_LAMBDA * std_vel)
         valid_idxs = np.argwhere(vel < thr2).ravel()
 
-        if round(thr2, 8) == round(prev_thr, 8) or counter >= HESSELS_MAX_ITER:
+        # Round to several decimals because of our high sampling rate (counter still doesn't exceed ~20 on average)
+        if round(thr2, 6) == round(prev_thr, 6) or counter >= HESSELS_MAX_ITER:
             break
 
         mean_vel = np.nanmean(vel[valid_idxs])
@@ -261,7 +261,7 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
     :param verbose: A bool indicating whether to print progress
     :return: A bool which indicates success or failure. Dataframe is immediately written to file
     """
-    np.seterr(divide='ignore', invalid='ignore', )
+    np.seterr(divide='ignore', invalid='ignore')
 
     try:
         df = load_data(f, delimiter, header)
@@ -269,9 +269,9 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
         y_before = np.array(df['y'])
         ts = np.array(df['time']).astype(int)
 
-        filter_len = 31
-        x = savgol_filter(x_before, filter_len, 2, mode='nearest')
-        y = savgol_filter(y_before, filter_len, 2, mode='nearest')
+        x = savgol_filter(x_before, HESSELS_SAVGOL_LEN, 2, mode='nearest')
+        y = savgol_filter(y_before, HESSELS_SAVGOL_LEN, 2, mode='nearest')
+        # plot_timeseries(x_before[:1000], x[:1000], str(f.stem), smoothing=f'savgol ({HESSELS_SAVGOL_LEN}, 2)')
 
         # Retrieve euclidean velocity from each datapoint to the next
         # vx = detect_velocity(x, ts)
@@ -281,7 +281,7 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
         vel = detect_velocity_python(x, y, ts)
 
         window_size = int(HESSELS_WINDOW_SIZE)
-        last_window_start_idx = len(ts) - window_size  # (window_size + 1)
+        last_window_start_idx = len(ts) - window_size
 
         thr, ninwin = np.zeros(len(ts)), np.zeros(len(ts))
 
@@ -344,11 +344,12 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
                    'start_x':   start_x,
                    'start_y':   start_y,
                    'end_x':     end_x,
-                   'end_y':     end_y}
+                   'end_y':     end_y
+                   }
 
         results = pd.DataFrame(results)
-        results = results.loc[results['duration'] >= .03]  # Remove all rows where duration < 30 ms
-        results = results.loc[results['duration'] <= 5.0]
+        results = results.loc[results['duration'] >= .03]  # Keep only rows where 30ms < duration < 3000ms
+        results = results.loc[results['duration'] <= 3.0]  # Keep only rows where 30ms < duration < 3000ms
         results = results.loc[results['peak_vel'] <= 1000]
 
         if not PURSUIT_AS_FIX:

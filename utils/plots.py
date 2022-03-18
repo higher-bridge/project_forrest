@@ -221,7 +221,7 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, dp
     features = [f'{f[1]} {rename_features(f[0])}' for f in features_]
     df.columns = features
 
-    # Sort dataframe by median
+    # Sort dataframe by mean
     df_sorted = df.reindex(df.mean().sort_values().index, axis=1)
 
     # Melt the dataframe so that feature and value get their own columns
@@ -247,10 +247,11 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, dp
                                           np.mean(df_['Feature importance']))
 
         if p:
-            plt.text(x=max(feature_means) * 1.08, y=i, s='*',
+            plt.text(x=max(feature_means) * 1.2, y=i, s='*',
                      color='red', ha='center', va='center',
                      fontsize=13)
 
+    plt.xlim((0, max(feature_means) * 1.3))
     plt.tight_layout()
     savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png'
     plt.savefig(savepath, dpi=dpi)

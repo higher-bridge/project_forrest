@@ -134,4 +134,5 @@ dmypy.json
 # File types
 *.tsv
 *.png
+*.p
 .DS_Store

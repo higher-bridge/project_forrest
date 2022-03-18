@@ -27,9 +27,9 @@ def remove_temp_files(directory, key='._'):
     sometimes (at least by macOS) """
 
     files_removed = 0
-    all_files = directory.glob(f'*{key}')
-    
-    for filename in all_files:
+    all_files = directory.rglob(f'{key}*')
+
+    for filename in list(all_files):
         os.remove(filename)
         files_removed += 1
             

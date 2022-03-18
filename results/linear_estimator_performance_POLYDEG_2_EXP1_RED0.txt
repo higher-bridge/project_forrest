@@ -1,1 +1,1 @@
-Linear regression (50 runs) mean R-squared on train set = 1.0 (SD = 0.0). Mean R-squared on test set = -37.14 (SD = 15.66). Best = -16.75.
+Linear regression (50 runs) mean R-squared on train set = 1.0 (SD = 0.0). Mean R-squared on test set = -20.9 (SD = 8.38). Best = -10.31.
