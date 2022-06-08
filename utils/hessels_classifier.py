@@ -24,6 +24,7 @@ Original Matlab implementation (and remaining documentation) can be found at:
 https://github.com/dcnieho/GlassesViewer/tree/master/user_functions/HesselsEtAl2020
 """
 
+from itertools import repeat
 from pathlib import Path
 from typing import List, Tuple
 
@@ -239,12 +240,54 @@ def threshold(vel: np.ndarray) -> np.array:
     return np.array([thr2] * len(vel))
 
 
+def get_blink_indices(p: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    # Detect where switches of True <-> False occur and return those indices
+    zeroes = p < 10  # < 10 is no pupil signal
+    onsets, offsets = detect_switches(zeroes)
+
+    return onsets, offsets
+
+
+def insert_blinks(p: np.ndarray, ts: np.ndarray, imarks: np.ndarray, phase_types: List[str]) -> Tuple[np.ndarray,
+                                                                                                      np.ndarray,
+                                                                                                      np.ndarray]:
+    # Create new list with length of p
+    new_imarks, new_phase_types = np.zeros(len(p), dtype=int), np.array(['Empty'] * len(p))
+
+    # Fill these lists with the corresponding imark and phase type as repeating values
+    # (e.g. len(p) = 200k and imarks = [1, 320, ...]; fill new_imarks[1:320] with 1
+    for i in range(len(imarks) - 1):
+        idxs = np.arange(imarks[i], imarks[i + 1] - 1)
+        new_imarks[idxs] = imarks[i]
+        new_phase_types[idxs] = phase_types[i]
+
+    onsets, offsets = get_blink_indices(p)
+
+    # IF there are blinks, fill new lists between on- and offsets
+    if len(onsets) > 0:
+        for on, off in zip(onsets, offsets):
+            new_imarks[on:off] = on
+            new_phase_types[on:off] = 'BLINK'
+
+    # Detect starting indices of each phase type, and put them together in a sorted list
+    fix_onsets, _ = detect_switches(new_phase_types == 'FIXA')
+    sacc_onsets, _ = detect_switches(new_phase_types == 'SACC')
+    blink_onsets, _ = detect_switches(new_phase_types == 'BLINK')
+    imarks = np.array(sorted(np.concatenate([fix_onsets, sacc_onsets, blink_onsets])))
+
+    # For each onset index, grab the appropriate phase type and timestamp
+    phase_types = new_phase_types[imarks]
+    smarks = ts[imarks]
+
+    return smarks, imarks, phase_types
+
+
 def load_data(f: Path, delimiter: str, header) -> pd.DataFrame:
     df = pd.read_csv(f, delimiter=delimiter, header=header)
 
     # Add colnames, drop last two (hardcoded for the studyforrest dataset, needs changing with other datasets)
     df.columns = ['x', 'y', 'pupilsize', 'frameno']
-    df = df.drop(['pupilsize', 'frameno'], axis=1)
+    df = df.drop(['frameno'], axis=1)
 
     # Data is steady 1kHz, but has no timestamps, so add (in ms)
     df['time'] = np.arange(len(df))
@@ -271,7 +314,7 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
 
         x = savgol_filter(x_before, HESSELS_SAVGOL_LEN, 2, mode='nearest')
         y = savgol_filter(y_before, HESSELS_SAVGOL_LEN, 2, mode='nearest')
-        # plot_timeseries(x_before[:1000], x[:1000], str(f.stem), smoothing=f'savgol ({HESSELS_SAVGOL_LEN}, 2)')
+        p = np.array(df['pupilsize'])
 
         # Retrieve euclidean velocity from each datapoint to the next
         # vx = detect_velocity(x, ts)
@@ -310,13 +353,6 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
 
         imarks = merge_fix_candidates(imarks, x, y)
 
-        try:
-            smarks = ts[imarks]
-        except IndexError as e:
-            print(f, e)
-            imarks[-1] -= 1
-            smarks = ts[imarks]
-
         # Alternate slow and fast phases
         phase_types = []
         for i, _ in enumerate(imarks):
@@ -325,12 +361,14 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
             else:
                 phase_types.append('SACC')
 
+        smarks, imarks, phase_types = insert_blinks(p, ts, imarks, phase_types)
+
         # Check for too much missing data
         for i in range(len(imarks) - 1):
             idxs = np.arange(imarks[i] + 1, imarks[i + 1] - 2)
             nans = np.sum(np.isnan(x[idxs]))
-            if nans >= (len(idxs) / 2):
-                phase_types[i] = 'none'
+            if nans >= (len(idxs) * 0.5) and phase_types[i] != 'BLINK':
+                phase_types[i] = 'LOSS'
 
         # Retrieve some extra information from the data
         start_x, start_y, end_x, end_y = _get_starts_ends(x, y, imarks)
@@ -348,15 +386,15 @@ def classify_hessels2020(f: Path, delimiter='\t', header=None, verbose: bool = F
                    }
 
         results = pd.DataFrame(results)
+
         results = results.loc[results['duration'] >= .03]  # Keep only rows where 30ms < duration < 3000ms
+
         results = results.loc[results['duration'] <= 3.0]  # Keep only rows where 30ms < duration < 3000ms
-        results = results.loc[results['peak_vel'] <= 1000]
+
+        # results = results.loc[results['peak_vel'] <= 1000]
 
         if not PURSUIT_AS_FIX:
             results = _split_slow_phase(results)
-
-        if verbose:
-            print(results.head())
 
         results.to_csv(str(f).replace('.tsv', '-extracted.tsv'), sep=delimiter)
         return True

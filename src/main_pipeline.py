@@ -65,7 +65,7 @@ def run_single_pipeline(group: bool = False,
         combined_df = pd.concat(dataframes_grouped)
         plot_feature_hist(combined_df)
         plot_heartrate_hist(combined_df)
-        plot_heartrate_over_time(combined_df, feature='heartrate')
+        # plot_heartrate_over_time(combined_df, feature='heartrate')
 
     # Pre-process data
     if not process:

@@ -50,6 +50,10 @@ def rename_types(x: str) -> str:
         return 'Saccade'
     elif x == 'PURS':
         return 'Fixation' if PURSUIT_AS_FIX else 'Pursuit'
+    elif x == 'BLINK':
+        return 'Blink'
+    # elif x == 'LOSS':
+    #     return 'Loss'
     else:
         return 'NA'
 
@@ -102,10 +106,10 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
 
         # Drop unnecessary columns
         df = df.drop(['Unnamed: 0', 'onset', 'start_x', 'start_y', 'end_x', 'end_y'], axis=1)
-        df = df.dropna()
+        # df = df.dropna()
 
         # Compute a counter and compute the mean
-        df_counts = df.groupby(['chunk', 'label']).agg(['count', 'mean']).reset_index()
+        df_counts = df.groupby(['chunk', 'label']).agg(['count', np.nanmean]).reset_index()
 
         # Aggregate, either by mean or with statistical descriptors
         if not feature_explosion:
@@ -116,12 +120,17 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
         # Add the count variable again
         df_agg['count'] = df_counts['duration']['count']
 
-        df_agg['label_hr'] = df_counts['label_hr']['mean']
-        df_agg['label_hr_median'] = df_counts['label_hr_median']['mean']
-        df_agg['label_hr_log'] = df_counts['label_hr_log']['mean']
-        df_agg['label_hr_medsplit'] = df_counts['label_hr_medsplit']['mean']
-        df_agg['ID'] = df_counts['ID']['mean']
-        df_agg['heartrate'] = df_counts['heartrate']['mean']
+        blink_rows = np.argwhere(np.array(df_agg['label']) == 'Blink').ravel()
+        df_agg['amp'].iloc[blink_rows] = np.nan
+        df_agg['peak_vel'].iloc[blink_rows] = np.nan
+        df_agg['med_vel'].iloc[blink_rows] = np.nan
+
+        df_agg['label_hr'] = df_counts['label_hr']['nanmean']
+        df_agg['label_hr_median'] = df_counts['label_hr_median']['nanmean']
+        df_agg['label_hr_log'] = df_counts['label_hr_log']['nanmean']
+        df_agg['label_hr_medsplit'] = df_counts['label_hr_medsplit']['nanmean']
+        df_agg['ID'] = df_counts['ID']['nanmean']
+        df_agg['heartrate'] = df_counts['heartrate']['nanmean']
 
         # Give each movement type its own feature column instead of having one column with strings
         if flatten:
@@ -203,6 +212,12 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
             try:
                 pc_train = pca.fit_transform(df_section_train)
                 pc_test = pca.transform(df_section_test)
+
+                # explained_variance_ratio = pca.explained_variance_ratio_
+                explained_variance = pca.explained_variance_
+                with open(ROOT_DIR / 'results' / f'explained_variance_{move_type}_{feature}_{time.time()}.txt', 'w') as file:
+                    file.write(str(explained_variance))
+
             except Exception as e:
                 print(e)
 
@@ -421,7 +436,7 @@ def run_model_search(dataframes: List[pd.DataFrame],
 
     # Save cross-validation results
     cv_results['overfit_factor'] = cv_results['mean_train_score'] / cv_results['mean_test_score']
-    cv_results.to_csv(ROOT_DIR / 'results' / f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
+    cv_results.to_csv(f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save the gini coefficients
     coefficients.to_csv(

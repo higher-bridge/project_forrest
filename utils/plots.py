@@ -77,7 +77,7 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
     nrows = len(features)
     ncols = len(move_types)
 
-    f = plt.figure(figsize=(7.5, 1.35 * nrows))
+    f = plt.figure(figsize=(14.65 * 0.5, 16.85 * 0.5))
     axes = [f.add_subplot(nrows, ncols, x + 1) for x in range(nrows * ncols)]
 
     palette = sns.color_palette('tab10')
@@ -105,13 +105,13 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
 
             # Set feature label only on first column
             if i % ncols == 0:
-                axes[i].set_ylabel(rename_features(feature), fontsize=9)
+                axes[i].set_ylabel(rename_features(feature), fontsize=11)
             else:
                 axes[i].set_ylabel('')
 
             # Set movement type label only beneath last row
             if i >= (nrows * ncols) - ncols:
-                axes[i].set_xlabel(f'{move_type}s')
+                axes[i].set_xlabel(f'{move_type}s', fontsize=11)
             else:
                 axes[i].set_xlabel('')
 
@@ -159,8 +159,11 @@ def plot_heartrate_hist(df: pd.DataFrame) -> None:
 
 
 def plot_heartrate_over_time(df: pd.DataFrame, feature: str = 'heartrate') -> None:
-    f = plt.figure(figsize=(7.5, 10))
-    axes = [f.add_subplot(8, 2, i + 1) for i in range(len(list(df['ID'].unique())))]
+    # f = plt.figure(figsize=(7.5, 10))
+    # axes = [f.add_subplot(8, 2, i + 1) for i in range(len(list(df['ID'].unique())))]
+
+    f = plt.figure(figsize=(14 * .5, 8.07 * .5))
+    axes = [f.add_subplot(1, 1, i + 1) for i in range(len(list(df['ID'].unique())))]
 
     for i, ID in enumerate(list(df['ID'].unique())):
         df_ = df.loc[df['ID'] == ID]
@@ -189,12 +192,15 @@ def plot_heartrate_over_time(df: pd.DataFrame, feature: str = 'heartrate') -> No
         axes[i].axhline(y=bottom, xmin=0, xmax=240, color='red', linestyle='--')
 
         # Set feature label only on first column
-        if i % 2 == 0:
-            axes[i].set_ylabel(feature)
-        else:
-            axes[i].set_ylabel('')
+        # if i % 2 == 0:
+        #     axes[i].set_ylabel(feature)
+        # else:
+        #     axes[i].set_ylabel('')
 
-        axes[i].set_xlabel('')
+        axes[i].set_xlim((0, 240))
+        axes[i].set_xticks(np.arange(280, step=40))
+        axes[i].set_ylabel('Heart rate', fontsize=12)
+        axes[i].set_xlabel('Chunk', fontsize=12)
 
     plt.tight_layout()
     save_path = ROOT_DIR / 'results' / 'plots' / f'{feature}_over_time.png'
@@ -235,23 +241,25 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, dp
                 capsize=.5, errwidth=1.2,
                 orient='h')
     plt.axvline(x=np.mean(df_['Feature importance']), linestyle='--', color='red')
-    plt.xlabel(f'Feature importance coefficient')  # (explosion={feature_explosion}, reduction={feature_reduction})')
+    plt.xlabel(f'Feature importance (higher is better)', fontsize=12)  # (explosion={feature_explosion}, reduction={feature_reduction})')
+    plt.ylabel('')
+    plt.yticks(fontsize=12)
 
     # Compute the mean impurity for each feature, so we can use it later to determine the max and plot a * besides it
     feature_means = [np.mean(df_.loc[df_['Feature'] == feat]['Feature importance']) for feat in list(df_['Feature'].unique())]
 
     # Run a one_sample t-test for each feature, comparing it to the overall mean
-    for i, feat in enumerate(list(df_['Feature'].unique())):
-        df_feat = df_.loc[df_['Feature'] == feat]
-        p = test_if_significant_from_mean(df_feat['Feature importance'],
-                                          np.mean(df_['Feature importance']))
+    # for i, feat in enumerate(list(df_['Feature'].unique())):
+    #     df_feat = df_.loc[df_['Feature'] == feat]
+    #     p = test_if_significant_from_mean(df_feat['Feature importance'],
+    #                                       np.mean(df_['Feature importance']))
+    #
+    #     if p:
+    #         plt.text(x=max(feature_means) * 1.2, y=i, s='*',
+    #                  color='red', ha='center', va='center',
+    #                  fontsize=13)
 
-        if p:
-            plt.text(x=max(feature_means) * 1.2, y=i, s='*',
-                     color='red', ha='center', va='center',
-                     fontsize=13)
-
-    plt.xlim((0, max(feature_means) * 1.3))
+    # plt.xlim((0, max(feature_means) * 1.3))
     plt.tight_layout()
     savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png'
     plt.savefig(savepath, dpi=dpi)

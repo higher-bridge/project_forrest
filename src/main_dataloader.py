@@ -23,7 +23,7 @@ from utils.detection import (add_bpm_to_eyetracking, get_bpm_dict,
 from utils.file_management import (add_ID_column, concatenate_files,
                                    get_list_of_files, load_merged_files,
                                    write_to_tsv)
-from utils.plots import plot_phase_distributions
+from utils.plots import plot_phase_distributions, plot_feature_hist
 
 
 def main() -> None:

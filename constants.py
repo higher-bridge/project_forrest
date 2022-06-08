@@ -24,7 +24,7 @@ from matplotlib import rcParams
 SEED     = 42                         # Set a seed for reproducibility
 ROOT_DIR = Path(__file__).parent  # Set root directory for the entire project (can usually be left alone)
 
-N_JOBS   = 10                      # Set number of CPU threads for fixation classification and model parameter search
+N_JOBS   = 4                      # Set number of CPU threads for fixation classification and model parameter search
 
 PX2DEG   = 0.0186                 # Conversion factor from pixels to degrees vis. angle
 HZ       = 1000.0                 # Sampling rate of eye tracker
