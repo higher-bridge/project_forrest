@@ -23,100 +23,147 @@ import scipy.stats
 
 
 def _Range(a):
-    a = a[np.logical_not(np.isnan(a))]
-    if len(a) < 1:
+    try:
+        a = a[np.logical_not(np.isnan(a))]
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        return float(a.max() - a.min())
+    except:
         return np.nan
-    a = np.array(a)
-    return float(a.max() - a.min())
 
 
 def _tenthPerc(a):
-    a = a[np.logical_not(np.isnan(a))]
+    try:
+        a = a[np.logical_not(np.isnan(a))]
 
-    if len(a) < 1:
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        return float(scipy.stats.scoreatpercentile(a, 10))
+    except:
         return np.nan
-    a = np.array(a)
-    return float(scipy.stats.scoreatpercentile(a, 10))
 
 
 def _ninetythPerc(a):
-    a = a[np.logical_not(np.isnan(a))]
+    try:
+        a = a[np.logical_not(np.isnan(a))]
 
-    if len(a) < 1:
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        return float(scipy.stats.scoreatpercentile(a, 90))
+    except:
         return np.nan
-    a = np.array(a)
-    return float(scipy.stats.scoreatpercentile(a, 90))
 
 
 def _interQ_range(a):
-    a = a[np.logical_not(np.isnan(a))]
+    try:
+        a = a[np.logical_not(np.isnan(a))]
 
-    if len(a) < 1:
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        return float(np.subtract(*np.percentile(a, [75, 25])))
+    except:
         return np.nan
-    a = np.array(a)
-    return float(np.subtract(*np.percentile(a, [75, 25])))
 
 
 def _mean_abs_deviation(a):
-    a = a[np.logical_not(np.isnan(a))]
+    try:
+        a = a[np.logical_not(np.isnan(a))]
 
-    if len(a) < 1:
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        return float(np.mean(np.abs(a - a.mean())))
+    except:
         return np.nan
-    a = np.array(a)
-    return float(np.mean(np.abs(a - a.mean())))
 
 
 def _energy(a):
-    a = a[np.logical_not(np.isnan(a))]
+    try:
+        a = a[np.logical_not(np.isnan(a))]
 
-    if len(a) < 1:
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        return float(np.multiply(a, a).sum())
+    except:
         return np.nan
-    a = np.array(a)
-    return float(np.multiply(a, a).sum())
 
 
 def _rms(a):
-    a = a[np.logical_not(np.isnan(a))]
+    try:
+        a = a[np.logical_not(np.isnan(a))]
 
-    if len(a) < 1:
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        return float(np.sqrt(np.divide(np.multiply(a, a).sum(), a.size)))
+    except:
         return np.nan
-    a = np.array(a)
-    return float(np.sqrt(np.divide(np.multiply(a, a).sum(), a.size)))
 
 
 def _entropy(a):
-    a = a[np.logical_not(np.isnan(a))]
+    try:
+        a = a[np.logical_not(np.isnan(a))]
 
-    if len(a) < 1:
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
+        probs = np.divide(scipy.stats.itemfreq(a)[:, 1], a.size)
+        return float(scipy.stats.entropy(probs, base=2))
+    except:
         return np.nan
-    a = np.array(a)
-    probs = np.divide(scipy.stats.itemfreq(a)[:, 1], a.size)
-    return float(scipy.stats.entropy(probs, base=2))
 
 
 def _uniformity(a):
-    a = a[np.logical_not(np.isnan(a))]
-    if len(a) < 1:
-        return np.nan
-    a = np.array(a)
+    try:
+        a = a[np.logical_not(np.isnan(a))]
+        if len(a) < 1:
+            return np.nan
+        a = np.array(a)
 
-    probs = np.divide(scipy.stats.itemfreq(a)[:, 1], a.size)
-    return float(np.multiply(probs, probs).sum())
+        probs = np.divide(scipy.stats.itemfreq(a)[:, 1], a.size)
+        return float(np.multiply(probs, probs).sum())
+    except:
+        return np.nan
 
 
 def _Mean(a):
-    return float(np.nanmean(a))
+    try:
+        return float(np.nanmean(a))
+    except:
+        return np.nan
 
 
 def _Variance(a):
-    return float(np.nanvar(a))
+    try:
+        return float(np.nanvar(a))
+    except:
+        return np.nan
+
+
+def _Skew(a):
+    try:
+        return float(scipy.stats.skew(a, nan_policy='omit'))
+    except:
+        return np.nan
+
+
+def _Kurtosis(a):
+    try:
+        return float(scipy.stats.kurtosis(a, nan_policy='omit'))
+    except:
+        return np.nan
 
 
 stat_features = [
     partial(_Mean),
     partial(_Variance),
-    partial(scipy.stats.skew, nan_policy='omit'),
-    partial(scipy.stats.kurtosis, nan_policy='omit'),
+    partial(_Skew),
+    partial(_Kurtosis),
     partial(_Range),
     partial(_tenthPerc),
     partial(_ninetythPerc),

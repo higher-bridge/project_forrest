@@ -16,6 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import json
 import pickle
 import time
 from itertools import repeat
@@ -115,7 +116,9 @@ def group_by_chunks(dfs: List[pd.DataFrame], feature_explosion: bool, flatten: b
         if not feature_explosion:
             df_agg = df.groupby(['chunk', 'label']).agg({feat: np.nanmean for feat in IND_VARS}).reset_index()
         else:
-            df_agg = df.groupby(['chunk', 'label']).agg({feat: stat_features for feat in IND_VARS}).reset_index()
+            # TODO: fix for blinks?
+            df_agg = df.groupby(['chunk', 'label'])
+            df_agg = df_agg.agg({feat: stat_features for feat in IND_VARS}).reset_index()
 
         # Add the count variable again
         df_agg['count'] = df_counts['duration']['count']
@@ -190,41 +193,46 @@ def get_data_stats(df: pd.DataFrame) -> None:
           f'{len_low} low ({perc_low}%), {len_high} high ({perc_high}%).')
 
 
-def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[np.array,
-                                                                                np.array,
-                                                                                List[str]]:
+def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame, continuous: bool) -> Tuple[np.array,
+                                                                                                  np.array,
+                                                                                                  List[str]]:
     # Split dfs and run PCA per feature
     split_dfs = []
 
     column_names = []
+    variances = {'move_type': [],
+                 'feature': [],
+                 'explained_variance': [],
+                 'explained_variance_ratio': []}
 
     # Columns are in format "feature descriptor move_type", e.g., "duration nanmean Fixation".
     # For each feature and move_type combination, run separate PCA over all of its descriptors. Then apply the PCA
     # to the test set too.
-    for move_type in ['Fixation', 'Saccade']:
+    for move_type in ['Fixation', 'Saccade', 'Blink']:
         for feature in IND_VARS:
             cols_to_use = [col for col in X_train.columns if move_type in col and feature in col]
 
             df_section_train = X_train.loc[:, cols_to_use]
             df_section_test = X_test.loc[:, cols_to_use]
 
-            pca = PCA(n_components=DIMENSIONS_PER_FEATURE, svd_solver='full', whiten=True)
+            pca = PCA(svd_solver='full', whiten=True)  # n_components=DIMENSIONS_PER_FEATURE,
             try:
                 pc_train = pca.fit_transform(df_section_train)
                 pc_test = pca.transform(df_section_test)
 
-                # explained_variance_ratio = pca.explained_variance_ratio_
-                explained_variance = pca.explained_variance_
-                with open(ROOT_DIR / 'results' / f'explained_variance_{move_type}_{feature}_{time.time()}.txt', 'w') as file:
-                    file.write(str(explained_variance))
+                variances['move_type'].append(move_type)
+                variances['feature'].append(feature)
+                variances['explained_variance'].append(list(pca.explained_variance_)[0:DIMENSIONS_PER_FEATURE])
+                variances['explained_variance_ratio'].append(list(pca.explained_variance_ratio_)[0:DIMENSIONS_PER_FEATURE])
+
+                # Append each column of the array separately
+                for i in range(DIMENSIONS_PER_FEATURE):
+                    split_dfs.append((pc_train[:, i], pc_test[:, i]))
+                    column_names.append(f'{move_type} {feature} PC{i}')
 
             except Exception as e:
-                print(e)
-
-            # Append each column of the array separately
-            for i in range(DIMENSIONS_PER_FEATURE):
-                split_dfs.append((pc_train[:, i], pc_test[:, i]))
-                column_names.append(f'{move_type} {feature} PC{i}')
+                # print(e)
+                pass
 
         # Count variable only has one column per move type, so don't do PCA and just append it again afterward
         split_dfs.append((X_train.loc[:, f'count  {move_type}'],
@@ -235,12 +243,20 @@ def reduce_dimensionality(X_train: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[
     X_train_new = np.array([x[0] for x in split_dfs]).T
     X_test_new = np.array([x[1] for x in split_dfs]).T
 
+    # Write explained variance to .json (add random number as unique identifier since we'll be writing many files;
+    # because of the seed it should always be the same numbers)
+    # json_string = json.dumps(variances)
+    with open(ROOT_DIR / 'results' / 'explained_variances' / f'explained_variance_'
+                                                             f'cont{int(continuous)}_'
+                                                             f'{str(float(np.random.random(1))).replace("0.", "")}'
+                                                             f'.json',
+              'w') as file:
+        json.dump(variances, file)
+
     return X_train_new, X_test_new, column_names
 
 
 def remove_outliers(x: np.array, y: List[Any]) -> Tuple[np.array, np.array]:
-    # num_rows = x.shape[0]
-
     for i in range(x.shape[1]):
         # Select column
         x_ = x[:, i]
@@ -271,6 +287,12 @@ def prepare_data(df: pd.DataFrame,
                  feature_explosion: bool, feature_reduction: bool) -> Tuple[Tuple[np.array, np.array],
                                                                             Tuple[np.array, np.array],
                                                                             List[str]]:
+    # Drop any columns that consist of more than 50% NaNs
+    cols = list(df.columns)
+
+    df = df.drop([c for c in cols if df[c].isna().sum() > len(df) * 0.5], axis=1)
+    # print(len(cols), '->', len(list(df.columns)), 'columns')
+
     # Drop NANs and remove data where label is not high or low
     df = df.dropna()
     df = df.loc[df[DEP_VAR_BINARY] != 'normal']
@@ -293,7 +315,7 @@ def prepare_data(df: pd.DataFrame,
     if feature_explosion and feature_reduction:
         X_train = pd.DataFrame(X_train, columns=column_names)
         X_test = pd.DataFrame(X_test, columns=column_names)
-        X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
+        X_train, X_test, column_names = reduce_dimensionality(X_train, X_test, continuous=False)
 
     # Map a StandardScaler based on train data and scale the test data using that mapping (similar to if this was
     # actually new/unseen data)
@@ -310,6 +332,11 @@ def prepare_data_continuous(df: pd.DataFrame,
                             y_feature: str = 'heartrate') -> Tuple[Tuple[np.array, np.array],
                                                                    Tuple[np.array, np.array],
                                                                    List[str]]:
+    # Drop any columns that consist of more than 50% NaNs
+    cols = list(df.columns)
+
+    df = df.drop([c for c in cols if df[c].isna().sum() > len(df) * 0.5], axis=1)
+
     # Drop NANs
     df = df.dropna()
 
@@ -338,7 +365,7 @@ def prepare_data_continuous(df: pd.DataFrame,
     if feature_explosion and feature_reduction:
         X_train = pd.DataFrame(X_train, columns=column_names)
         X_test = pd.DataFrame(X_test, columns=column_names)
-        X_train, X_test, column_names = reduce_dimensionality(X_train, X_test)
+        X_train, X_test, column_names = reduce_dimensionality(X_train, X_test, continuous=True)
 
     if poly_degree > 1:
         pf = PolynomialFeatures(degree=poly_degree, include_bias=False)
@@ -354,7 +381,6 @@ def run_model_search_iteration(df: pd.DataFrame, iteration_nr: int,
                                                                                           str,
                                                                                           List[str],
                                                                                           pd.DataFrame]:
-
     print(f'\nIteration {iteration_nr + 1}:')
     (X, X_test), (y, y_test), column_names = prepare_data(df,
                                                           feature_explosion=feature_explosion,
@@ -408,9 +434,9 @@ def run_model_search(dataframes: List[pd.DataFrame],
     # Run the model search a certain amount of times to correct for sampling biases
     for i in range(SEARCH_ITERATIONS):
         model_search, test_score, to_write, column_names, coefficients_iteration = run_model_search_iteration(df, i,
-                                                                                    feature_explosion=feature_explosion,
-                                                                                    feature_reduction=feature_reduction,
-                                                                                    )
+                                                                                                              feature_explosion=feature_explosion,
+                                                                                                              feature_reduction=feature_reduction,
+                                                                                                              )
 
         best_estimators.append(model_search.best_estimator_)
         test_scores.append(test_score)
@@ -436,7 +462,7 @@ def run_model_search(dataframes: List[pd.DataFrame],
 
     # Save cross-validation results
     cv_results['overfit_factor'] = cv_results['mean_train_score'] / cv_results['mean_test_score']
-    cv_results.to_csv(f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
+    cv_results.to_csv(ROOT_DIR / 'results' / f'cv_results_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.csv')
 
     # Save the gini coefficients
     coefficients.to_csv(
@@ -527,7 +553,7 @@ def get_scores_and_parameters(feature_explosion: bool, feature_reduction: bool, 
             depth_list.append(best_row['param_max_depth'])
 
         print(f'Rank {rank}:',
-              f'Score {np.mean(cv_list).round(3)}',
+              f'Score {np.mean(cv_list).round(3)} (SD = {np.std(cv_list).round(3)})',
               f'Trees {np.mean(trees_list).round(3)}',
               f'Depth {np.nanmean(depth_list).round(3)}')
 

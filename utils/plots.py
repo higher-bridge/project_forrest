@@ -71,8 +71,10 @@ def plot_timeseries(x: np.ndarray, x_after: np.ndarray, f: str, smoothing: str) 
 
 
 def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
-    features = IND_VARS + ['count']
+    features = ['count'] + IND_VARS
     move_types = list(df['label'].unique())
+
+    d = {'move_type': [], 'feature': [], 'hr': [], 'mean': [], 'median': [], 'sd': []}
 
     nrows = len(features)
     ncols = len(move_types)
@@ -82,10 +84,14 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
 
     palette = sns.color_palette('tab10')
 
+    legend, handles, labels = None, None, None
+
     i = 0
     for row, feature in enumerate(features):
-        for col, move_type in enumerate(move_types):
+        for col, move_type in enumerate(['Fixation', 'Saccade', 'Blink']):
             df_move_type = df.loc[df['label'] == move_type]
+            df_move_type = df_move_type.loc[df_move_type[DEP_VAR_BINARY] != 'normal']
+
             df_low = df_move_type.loc[df_move_type[DEP_VAR_BINARY] == 'low']
             df_high = df_move_type.loc[df_move_type[DEP_VAR_BINARY] == 'high']
 
@@ -93,12 +99,57 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
                         label='High', color=palette[1],
                         fill=True, linewidth=2.5,
                         common_norm=False, linestyle='--',
-                        clip=(0.0, 350))
+                        clip=(0.0, 400))
             sns.kdeplot(x=feature, data=df_low, ax=axes[i],
                         label='Low', color=palette[0],
                         fill=True, linewidth=2.5,
                         common_norm=False, linestyle='-',
-                        clip=(0.0, 350))
+                        clip=(0.0, 400))
+
+
+            if move_type == 'Blink' and feature in ['amp', 'peak_vel', 'med_vel']:
+                axes[i].set_xticks([])
+                sns.despine(ax=axes[i], top=True, bottom=True, left=True, right=True)
+            else:
+                high_median, high_std = np.nanmedian(df_high[feature]).round(1), np.nanstd(df_high[feature]).round(1)
+                low_median, low_std = np.nanmedian(df_low[feature]).round(1), np.nanstd(df_low[feature]).round(1)
+
+                xloc = axes[i].get_xlim()[1]
+                yloc = axes[i].get_ylim()[1]
+                axes[i].text(xloc, yloc, s=f'{high_median} ({high_std})\n{low_median} ({low_std})',
+                             ha='right', va='top', color=palette[1])
+                axes[i].text(xloc, yloc, s=f'\n{low_median} ({low_std})',
+                             ha='right', va='top', color=palette[0])
+
+                # d['move_type'].append(move_type)
+                # d['feature'].append(rename_features(feature))
+                # d['hr'].append('high')
+                # d['mean'].append(np.nanmean(df_high[feature]))
+                # d['median'].append()
+                # d['sd'].append()
+                #
+                # d['move_type'].append(move_type)
+                # d['feature'].append(rename_features(feature))
+                # d['hr'].append('low')
+                # d['mean'].append(np.nanmean(df_low[feature]))
+                # d['median'].append()
+                # d['sd'].append()
+
+            if move_type == 'Blink' and feature == 'duration':
+                axes[i].legend()
+                legend = axes[i].get_legend()
+                handles = legend.legendHandles
+
+            if move_type == 'Blink' and feature == 'amp':
+                axes[i].legend(handles=handles, labels=['High', 'Low'],
+                               fontsize=12,
+                               title='Heart rate (median/SD)', title_fontsize=12,
+                               loc='center', frameon=True)
+            else:
+                try:
+                    axes[i].get_legend().remove()
+                except AttributeError:
+                    pass
 
             # Remove y-ticks
             axes[i].set_yticks(list())
@@ -109,19 +160,14 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
             else:
                 axes[i].set_ylabel('')
 
-            # Set movement type label only beneath last row
-            if i >= (nrows * ncols) - ncols:
-                axes[i].set_xlabel(f'{move_type}s', fontsize=11)
-            else:
-                axes[i].set_xlabel('')
-
-            # Set legend only in top-left panel
-            if i == 0:
-                axes[i].legend(fontsize=10, title='Heart rate', loc='best')
-
+            # Remove xlabels and add place type on top as titles
+            axes[i].set_xlabel('')
             if i < ncols:
-                print(f'{move_type}, {len(df_low)} low, {len(df_high)} high,',
-                      f'{len(df_move_type) - len(df_low) - len(df_high)} in between. {len(df_move_type)} total.')
+                axes[i].set_title(f'{move_type}s', fontsize=12)
+
+            # if i < ncols:
+            #     print(f'{move_type}, {len(df_low)} low, {len(df_high)} high,',
+            #           f'{len(df_move_type) - len(df_low) - len(df_high)} in between. {len(df_move_type)} total.')
 
             i += 1
 
@@ -129,10 +175,12 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
     save_path = ROOT_DIR / 'results' / 'plots' / f'feature_hist.png'
     plt.savefig(save_path, dpi=dpi)
 
-    save_path = ROOT_DIR / 'results' / 'plots' / f'feature_hist.tiff'
+    save_path = ROOT_DIR / 'results' / 'plots' / f'feature_hist.svg'
     plt.savefig(save_path, dpi=dpi)
 
     plt.show()
+
+    return pd.DataFrame(d).dropna()
 
 
 def plot_heartrate_hist(df: pd.DataFrame) -> None:
@@ -241,30 +289,31 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, dp
                 capsize=.5, errwidth=1.2,
                 orient='h')
     plt.axvline(x=np.mean(df_['Feature importance']), linestyle='--', color='red')
-    plt.xlabel(f'Feature importance (higher is better)', fontsize=12)  # (explosion={feature_explosion}, reduction={feature_reduction})')
+    plt.xlabel(f'Feature importance', fontsize=12)  # (explosion={feature_explosion}, reduction={feature_reduction})')
     plt.ylabel('')
-    plt.yticks(fontsize=12)
+    plt.yticks(fontsize=10)
 
     # Compute the mean impurity for each feature, so we can use it later to determine the max and plot a * besides it
-    feature_means = [np.mean(df_.loc[df_['Feature'] == feat]['Feature importance']) for feat in list(df_['Feature'].unique())]
+    feature_means = [np.mean(df_.loc[df_['Feature'] == feat]['Feature importance']) for feat in
+                     list(df_['Feature'].unique())]
 
     # Run a one_sample t-test for each feature, comparing it to the overall mean
-    # for i, feat in enumerate(list(df_['Feature'].unique())):
-    #     df_feat = df_.loc[df_['Feature'] == feat]
-    #     p = test_if_significant_from_mean(df_feat['Feature importance'],
-    #                                       np.mean(df_['Feature importance']))
-    #
-    #     if p:
-    #         plt.text(x=max(feature_means) * 1.2, y=i, s='*',
-    #                  color='red', ha='center', va='center',
-    #                  fontsize=13)
+    for i, feat in enumerate(list(df_['Feature'].unique())):
+        df_feat = df_.loc[df_['Feature'] == feat]
+        p = test_if_significant_from_mean(df_feat['Feature importance'],
+                                          np.mean(df_['Feature importance']))
+
+        if p:
+            plt.text(x=max(feature_means) * 1.2, y=i, s='*',
+                     color='red', ha='center', va='center',
+                     fontsize=13)
 
     # plt.xlim((0, max(feature_means) * 1.3))
     plt.tight_layout()
     savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.png'
     plt.savefig(savepath, dpi=dpi)
 
-    savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.tiff'
+    savepath = ROOT_DIR / 'results' / 'plots' / f'feature_importances_EXP{int(feature_explosion)}_RED{int(feature_reduction)}.svg'
     plt.savefig(savepath, dpi=dpi)
 
     plt.show()
