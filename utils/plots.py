@@ -74,8 +74,6 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
     features = ['count'] + IND_VARS
     move_types = list(df['label'].unique())
 
-    d = {'move_type': [], 'feature': [], 'hr': [], 'mean': [], 'median': [], 'sd': []}
-
     nrows = len(features)
     ncols = len(move_types)
 
@@ -106,7 +104,6 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
                         common_norm=False, linestyle='-',
                         clip=(0.0, 400))
 
-
             if move_type == 'Blink' and feature in ['amp', 'peak_vel', 'med_vel']:
                 axes[i].set_xticks([])
                 sns.despine(ax=axes[i], top=True, bottom=True, left=True, right=True)
@@ -120,20 +117,6 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
                              ha='right', va='top', color=palette[1])
                 axes[i].text(xloc, yloc, s=f'\n{low_median} ({low_std})',
                              ha='right', va='top', color=palette[0])
-
-                # d['move_type'].append(move_type)
-                # d['feature'].append(rename_features(feature))
-                # d['hr'].append('high')
-                # d['mean'].append(np.nanmean(df_high[feature]))
-                # d['median'].append()
-                # d['sd'].append()
-                #
-                # d['move_type'].append(move_type)
-                # d['feature'].append(rename_features(feature))
-                # d['hr'].append('low')
-                # d['mean'].append(np.nanmean(df_low[feature]))
-                # d['median'].append()
-                # d['sd'].append()
 
             if move_type == 'Blink' and feature == 'duration':
                 axes[i].legend()
@@ -179,8 +162,6 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
     plt.savefig(save_path, dpi=dpi)
 
     plt.show()
-
-    return pd.DataFrame(d).dropna()
 
 
 def plot_heartrate_hist(df: pd.DataFrame) -> None:
