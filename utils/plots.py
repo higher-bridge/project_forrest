@@ -77,10 +77,11 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
     nrows = len(features)
     ncols = len(move_types)
 
-    f = plt.figure(figsize=(14.65 * 0.5, 16.85 * 0.5))
+    f = plt.figure(figsize=((14.65 * 0.5) * 2., (16.85 * 0.5) * 2.))
     axes = [f.add_subplot(nrows, ncols, x + 1) for x in range(nrows * ncols)]
 
     palette = sns.color_palette('tab10')
+    rcParams['font.size'] = 22
 
     legend, handles, labels = None, None, None
 
@@ -125,8 +126,8 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
 
             if move_type == 'Blink' and feature == 'amp':
                 axes[i].legend(handles=handles, labels=['High', 'Low'],
-                               fontsize=12,
-                               title='Heart rate (median/SD)', title_fontsize=12,
+                               # fontsize=12,
+                               title='Heart rate (median/SD)', #title_fontsize=12,
                                loc='center', frameon=True)
             else:
                 try:
@@ -139,14 +140,14 @@ def plot_feature_hist(df: pd.DataFrame, dpi=200) -> None:
 
             # Set feature label only on first column
             if i % ncols == 0:
-                axes[i].set_ylabel(rename_features(feature), fontsize=11)
+                axes[i].set_ylabel(rename_features(feature), fontsize=22)
             else:
                 axes[i].set_ylabel('')
 
             # Remove xlabels and add place type on top as titles
             axes[i].set_xlabel('')
             if i < ncols:
-                axes[i].set_title(f'{move_type}s', fontsize=12)
+                axes[i].set_title(f'{move_type}s', fontsize=24)
 
             # if i < ncols:
             #     print(f'{move_type}, {len(df_low)} low, {len(df_high)} high,',
@@ -264,15 +265,17 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, dp
     df_['Movement type'] = df_['Feature'].apply(lambda x: x.split()[0])
     df_['Movement type'] = pd.Categorical(df_['Movement type'])
 
-    plt.figure(figsize=(7.5, .33 * (len(list(df_['Feature'].unique())))))
+    rcParams['font.size'] = 20
+
+    plt.figure(figsize=(14.44, 7.62))
     sns.barplot(y='Feature', x='Feature importance', data=df_,
                 color='gray',
-                capsize=.5, errwidth=1.2,
+                capsize=.5, errwidth=2.4,
                 orient='h')
     plt.axvline(x=np.mean(df_['Feature importance']), linestyle='--', color='red')
-    plt.xlabel(f'Feature importance', fontsize=12)  # (explosion={feature_explosion}, reduction={feature_reduction})')
+    plt.xlabel(f'Feature importance', fontsize=22)  # (explosion={feature_explosion}, reduction={feature_reduction})')
     plt.ylabel('')
-    plt.yticks(fontsize=10)
+    plt.yticks(fontsize=22)
 
     # Compute the mean impurity for each feature, so we can use it later to determine the max and plot a * besides it
     feature_means = [np.mean(df_.loc[df_['Feature'] == feat]['Feature importance']) for feat in
@@ -287,7 +290,7 @@ def plot_feature_importance(feature_explosion: bool, feature_reduction: bool, dp
         if p:
             plt.text(x=max(feature_means) * 1.2, y=i, s='*',
                      color='red', ha='center', va='center',
-                     fontsize=13)
+                     fontsize=22)
 
     # plt.xlim((0, max(feature_means) * 1.3))
     plt.tight_layout()
