@@ -1,9 +1,8 @@
 # project_forrest
 
-This repository contains the code and outcome measures for the following manuscript (link will be added once manuscript becomes available):
+This repository contains the code and outcome measures for the following manuscript :
 
-**Seeing the Forrest through the trees: Oculomotor movement is linked to heart rate**
-Alex J. Hoogerbrugge, Christoph Strauch, Zoril A. Oláh, Edwin S. Dalmaijer, Tanja C.W. Nijboer, Stefan Van der Stigchel
+Hoogerbrugge, A. J., Strauch, C., Oláh, Z. A., Dalmaijer, E. S., Nijboer, T. C., & Van der Stigchel, S. (2022). Seeing the Forrest through the trees: Oculomotor metrics are linked to heart rate. PloS one, 17(8), e0272349.
 
 
 ### Procedure
